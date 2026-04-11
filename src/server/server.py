@@ -267,7 +267,7 @@ async def simulate(body: SimulateRequest, request: Request):
             def __init__(self, person_id, groups):
                 self.id = person_id
                 self.groups = groups
-        subject = _Subject(body.person, [body.group] if body.group else [])
+        subject = _Subject(body.person.lower(), [body.group.lower()] if body.group else [])
 
     # Run evaluation and collect the full trace
     trace = []
@@ -399,6 +399,7 @@ async def get_people(request: Request):
 
 class PersonBody(BaseModel):
     name: str
+    person_id: str = ""   # short ID used in rule person: field (e.g. "lew"); defaults to first word of name
     groups: list[str] = []
     telegram_id: str = ""
 
@@ -487,24 +488,31 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
     if path:
         params["path"] = path
 
-    # Resolve channel_id (e.g. "tg:6741893378") to a person from the roster
+    # Resolve caller identity — check channel_id, then fall back to params._caller
+    caller_id = body.channel_id or body.params.get("_caller", "")
     person_name = body.person
+    person_id_str = body.person  # short ID used in rule matching
     person_groups = [body.group] if body.group else []
-    if body.channel_id:
+    if caller_id:
         people = database.get_people(email)
-        match = next((p for p in people if p.get("telegram_id") == body.channel_id), None)
-        if match:
-            person_name = match.get("name", person_name)
-            person_groups = match.get("groups", person_groups)
+        matched_person = next((p for p in people if p.get("telegram_id") == caller_id), None)
+        if matched_person:
+            person_name = matched_person.get("name", person_name)
+            person_groups = matched_person.get("groups", person_groups)
+            # Use person_id if set, otherwise fall back to first word of name
+            raw_id = matched_person.get("person_id", "").strip()
+            if not raw_id:
+                raw_id = person_name.split()[0] if person_name else person_name
+            person_id_str = raw_id
 
     # Build subject if person/group resolved
     subject = None
-    if person_name or person_groups:
+    if person_id_str or person_groups:
         class _Subject:
-            def __init__(self, person_id, groups):
-                self.id = person_id
+            def __init__(self, pid, groups):
+                self.id = pid
                 self.groups = groups
-        subject = _Subject(person_name, person_groups)
+        subject = _Subject(person_id_str.lower(), [g.lower() for g in person_groups])
 
     # Find first matching rule
     verdict = "no-match"

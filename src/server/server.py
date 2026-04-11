@@ -427,6 +427,19 @@ async def generate_token(request: Request):
     return {"token": token}
 
 
+class TokenBody(BaseModel):
+    token: str
+
+
+@app.post("/token/set")
+async def set_token(body: TokenBody, request: Request):
+    email = _require_session(request)
+    if not body.token.strip():
+        raise HTTPException(status_code=400, detail="Token cannot be empty")
+    database.save_agent_token(email, body.token.strip())
+    return {"token": body.token.strip()}
+
+
 @app.delete("/token")
 async def revoke_token(request: Request):
     email = _require_session(request)

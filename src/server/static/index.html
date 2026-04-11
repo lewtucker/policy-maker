@@ -254,6 +254,8 @@
     .activity-token-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 10px; }
     .activity-token-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .activity-token-value { font-family: var(--mono); font-size: 13px; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 6px 12px; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-token-input { font-family: var(--mono); font-size: 13px; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 6px 12px; color: var(--text); flex: 1; min-width: 0; outline: none; }
+    .activity-token-input:focus { border-color: var(--blue); }
     .activity-token-hint { font-size: 12px; color: var(--muted); line-height: 1.8; }
     .activity-token-hint code { font-family: var(--mono); font-size: 11px; background: var(--surface2); padding: 1px 5px; border-radius: 3px; color: var(--text-dim); }
     .btn-danger-sm { background: none; border: 1px solid rgba(239,68,68,.4); color: var(--red); border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
@@ -587,7 +589,8 @@
       <div class="activity-token-card">
         <div class="activity-token-label">Agent Token</div>
         <div class="activity-token-row">
-          <code class="activity-token-value" id="token-display">—</code>
+          <input class="activity-token-input" id="token-input" type="text" placeholder="Enter your own token or click Generate…" oninput="onTokenInput()" />
+          <button class="btn-secondary" onclick="saveCustomToken()" id="btn-save-token" style="display:none;">Save</button>
           <button class="btn-secondary" onclick="copyToken()" id="btn-copy-token" style="display:none;">Copy</button>
           <button class="btn-secondary" onclick="generateToken()">Generate</button>
           <button class="btn-danger-sm" onclick="revokeToken()" id="btn-revoke-token" style="display:none;">Revoke</button>
@@ -1362,17 +1365,29 @@
   }
 
   function renderToken(token) {
-    const display = document.getElementById('token-display');
+    const input = document.getElementById('token-input');
+    const btnSave = document.getElementById('btn-save-token');
     const btnCopy = document.getElementById('btn-copy-token');
     const btnRevoke = document.getElementById('btn-revoke-token');
-    if (token) {
-      display.textContent = token;
-      btnCopy.style.display = '';
-      btnRevoke.style.display = '';
-    } else {
-      display.textContent = '—';
-      btnCopy.style.display = 'none';
-      btnRevoke.style.display = 'none';
+    input.value = token || '';
+    btnSave.style.display = 'none';
+    btnCopy.style.display = token ? '' : 'none';
+    btnRevoke.style.display = token ? '' : 'none';
+  }
+
+  function onTokenInput() {
+    const input = document.getElementById('token-input');
+    const isDirty = input.value.trim() !== (_currentToken || '');
+    document.getElementById('btn-save-token').style.display = isDirty && input.value.trim() ? '' : 'none';
+  }
+
+  async function saveCustomToken() {
+    const val = document.getElementById('token-input').value.trim();
+    if (!val) return;
+    const res = await api('POST', '/token/set', { token: val });
+    if (res && res.ok) {
+      _currentToken = val;
+      renderToken(_currentToken);
     }
   }
 
@@ -1395,9 +1410,7 @@
   }
 
   function copyToken() {
-    if (_currentToken) {
-      navigator.clipboard.writeText(_currentToken);
-    }
+    if (_currentToken) navigator.clipboard.writeText(_currentToken);
   }
 
   function renderActivityLog(rows) {

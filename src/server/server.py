@@ -8,6 +8,8 @@ import secrets
 import tempfile
 import uuid
 import yaml
+import hashlib
+import hmac
 from pathlib import Path
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -31,6 +33,31 @@ SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 APP_PASSWORD   = os.environ.get("APP_PASSWORD")
 if not APP_PASSWORD:
     raise RuntimeError("APP_PASSWORD is not set. Add it to src/server/.env or the environment.")
+
+
+# ── Password hashing (PBKDF2-HMAC-SHA256, no extra deps) ──────────────────────
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260_000)
+    return f"{salt}${dk.hex()}"
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        salt, dk_hex = stored_hash.split("$", 1)
+    except ValueError:
+        return False
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260_000)
+    return hmac.compare_digest(dk.hex(), dk_hex)
+
+
+def _check_login(email: str, password: str) -> bool:
+    """Returns True if password matches the user's stored hash, or the APP_PASSWORD fallback."""
+    stored = database.get_password_hash(email)
+    if stored:
+        return _verify_password(password, stored)
+    return password == APP_PASSWORD
 
 
 @asynccontextmanager
@@ -83,7 +110,7 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(request: Request, email: str = Form(...), password: str = Form(...)):
     email = email.strip().lower()
-    if not email or password != APP_PASSWORD:
+    if not email or not _check_login(email, password):
         return RedirectResponse("/login?error=1", status_code=303)
     database.get_or_create_user(email)
     request.session["email"] = email
@@ -102,6 +129,24 @@ async def me(request: Request):
     user = database.get_user(email)
     engine = _get_engine(email)
     return {"email": email, "rule_count": len(engine.rules), "created_at": user["created_at"]}
+
+
+# ── Profile endpoints ─────────────────────────────────────────────────────────
+
+class ChangePasswordBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/profile/password")
+async def change_password(body: ChangePasswordBody, request: Request):
+    email = _require_session(request)
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    if not _check_login(email, body.current_password):
+        raise HTTPException(status_code=403, detail="Current password is incorrect")
+    database.set_password_hash(email, _hash_password(body.new_password))
+    return {"changed": True}
 
 
 # ── Policy endpoints ──────────────────────────────────────────────────────────

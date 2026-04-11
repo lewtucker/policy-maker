@@ -26,12 +26,13 @@ def init_db() -> None:
     with _conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                email        TEXT PRIMARY KEY,
-                rules_yaml   TEXT NOT NULL DEFAULT '',
-                skill_text   TEXT,
-                agent_token  TEXT,
-                people_json  TEXT NOT NULL DEFAULT '[]',
-                created_at   TEXT NOT NULL
+                email         TEXT PRIMARY KEY,
+                rules_yaml    TEXT NOT NULL DEFAULT '',
+                skill_text    TEXT,
+                agent_token   TEXT,
+                people_json   TEXT NOT NULL DEFAULT '[]',
+                password_hash TEXT,
+                created_at    TEXT NOT NULL
             )
         """)
         conn.execute("""
@@ -65,6 +66,7 @@ def init_db() -> None:
         for col, definition in [
             ("agent_token", "TEXT"),
             ("people_json", "TEXT NOT NULL DEFAULT '[]'"),
+            ("password_hash", "TEXT"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
@@ -189,6 +191,17 @@ def get_check_log(email: str, limit: int = 50) -> list[sqlite3.Row]:
                ORDER BY id DESC LIMIT ?""",
             (email, limit),
         ).fetchall()
+
+
+def get_password_hash(email: str) -> str | None:
+    user = get_user(email)
+    return user["password_hash"] if user else None
+
+
+def set_password_hash(email: str, password_hash: str) -> None:
+    with _conn() as conn:
+        conn.execute("UPDATE users SET password_hash = ? WHERE email = ?", (password_hash, email))
+        conn.commit()
 
 
 def clear_check_log(email: str) -> None:

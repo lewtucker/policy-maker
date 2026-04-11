@@ -89,6 +89,7 @@
     .banner.error   { background: rgba(239,68,68,.1);  border: 1px solid var(--red-dim);  color: var(--red); }
     .banner.info    { background: rgba(37,99,235,.1);  border: 1px solid var(--blue-dim); color: var(--blue); }
     .banner.warning { background: rgba(245,158,11,.1); border: 1px solid var(--amber);    color: var(--amber); }
+    .banner.success { background: rgba(34,197,94,.1);  border: 1px solid rgba(34,197,94,.35); color: #22c55e; }
 
     /* ── Health panel ── */
     .health-bar { display: flex; gap: 10px; flex-wrap: wrap; padding: 12px 12px 8px; }
@@ -249,6 +250,17 @@
     .muted { color: var(--muted); }
     .mono  { font-family: var(--mono); }
 
+    /* ── Profile page ── */
+    .profile-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:24px 28px; }
+    .profile-section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:16px; }
+    .profile-field { display:flex; flex-direction:column; gap:5px; margin-bottom:16px; }
+    .profile-field label { font-size:12px; font-weight:600; color:var(--text-dim); }
+    .profile-field input { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-size:13px; color:var(--text); outline:none; font-family:inherit; }
+    .profile-field input:focus { border-color:var(--blue); }
+    .profile-field .form-hint { font-size:11px; color:var(--muted); }
+    .profile-email-display { font-family:var(--mono); font-size:14px; color:var(--text); padding:8px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; }
+    .sidebar-email-link { cursor:pointer; text-decoration:none; color:inherit; }
+    .sidebar-email-link:hover { text-decoration:underline; color:var(--blue); }
     /* ── Approval badge ── */
     .approval-badge { position:absolute; top:6px; right:10px; background:var(--red); color:#fff; font-size:10px; font-weight:700; border-radius:9px; padding:1px 6px; line-height:14px; }
     /* ── Approval cards ── */
@@ -339,7 +351,7 @@
   <div class="sidebar-bottom">
     <div class="user-row">
       <span style="font-size:15px;">👤</span>
-      <span class="user-email" id="sidebar-email">…</span>
+      <span class="user-email sidebar-email-link" id="sidebar-email" onclick="showPage('profile',this)" title="Manage profile">…</span>
       <form method="POST" action="/logout" style="flex-shrink:0;">
         <button type="submit" class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px;">Sign out</button>
       </form>
@@ -613,6 +625,70 @@
     </div>
   </div>
 
+  <!-- ── Profile page ── -->
+  <div class="page" id="page-profile">
+    <div class="page-header">
+      <div class="page-title-block">
+        <div class="page-title">Profile</div>
+        <div class="page-sub">Manage your account settings and agent token</div>
+      </div>
+    </div>
+    <div class="page-body" style="display:flex;flex-direction:column;gap:20px;padding-top:16px;max-width:560px;">
+
+      <!-- Account info -->
+      <div class="profile-card">
+        <div class="profile-section-title">Account</div>
+        <div class="profile-field">
+          <label>Email</label>
+          <div class="profile-email-display" id="profile-email">—</div>
+        </div>
+        <div class="profile-field">
+          <label>Member since</label>
+          <div class="profile-email-display" id="profile-created">—</div>
+        </div>
+      </div>
+
+      <!-- Change password -->
+      <div class="profile-card">
+        <div class="profile-section-title">Change Password</div>
+        <div class="banner error" id="profile-pw-error"></div>
+        <div class="banner success" id="profile-pw-success"></div>
+        <div class="profile-field">
+          <label>Current password</label>
+          <input type="password" id="profile-current-pw" placeholder="Enter current password" autocomplete="current-password" />
+          <div class="form-hint">If you haven't set a personal password, use the shared sign-in password.</div>
+        </div>
+        <div class="profile-field">
+          <label>New password</label>
+          <input type="password" id="profile-new-pw" placeholder="At least 8 characters" autocomplete="new-password" />
+        </div>
+        <div class="profile-field">
+          <label>Confirm new password</label>
+          <input type="password" id="profile-confirm-pw" placeholder="Repeat new password" autocomplete="new-password" />
+        </div>
+        <button class="btn btn-primary" onclick="changePassword()" style="margin-top:4px;">Update password</button>
+      </div>
+
+      <!-- Agent token -->
+      <div class="profile-card">
+        <div class="profile-section-title">Agent Token</div>
+        <div class="activity-token-row">
+          <input class="activity-token-input" id="token-input" type="text" placeholder="Enter your own token or click Generate…" oninput="onTokenInput()" />
+          <button class="btn-secondary" onclick="saveCustomToken()" id="btn-save-token" style="display:none;">Save</button>
+          <button class="btn-secondary" onclick="copyToken()" id="btn-copy-token" style="display:none;">Copy</button>
+          <button class="btn-secondary" onclick="generateToken()">Generate</button>
+          <button class="btn-danger-sm" onclick="revokeToken()" id="btn-revoke-token" style="display:none;">Revoke</button>
+        </div>
+        <div class="activity-token-hint" style="margin-top:10px;">
+          Configure your OpenClaw plugin with:<br/>
+          <code>OC_POLICY_SERVER_URL=https://policy.lewtucker.net</code><br/>
+          <code>OC_POLICY_AGENT_TOKEN=&lt;your token&gt;</code>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- ── Approvals page ── -->
   <div class="page" id="page-approvals">
     <div class="page-header">
@@ -640,23 +716,6 @@
       <button class="btn-secondary" onclick="loadActivity()">↺ Refresh</button>
     </div>
     <div class="page-body" style="display:flex;flex-direction:column;gap:20px;padding-top:16px;overflow:hidden;flex:1;min-height:0;">
-
-      <!-- Token management -->
-      <div class="activity-token-card">
-        <div class="activity-token-label">Agent Token</div>
-        <div class="activity-token-row">
-          <input class="activity-token-input" id="token-input" type="text" placeholder="Enter your own token or click Generate…" oninput="onTokenInput()" />
-          <button class="btn-secondary" onclick="saveCustomToken()" id="btn-save-token" style="display:none;">Save</button>
-          <button class="btn-secondary" onclick="copyToken()" id="btn-copy-token" style="display:none;">Copy</button>
-          <button class="btn-secondary" onclick="generateToken()">Generate</button>
-          <button class="btn-danger-sm" onclick="revokeToken()" id="btn-revoke-token" style="display:none;">Revoke</button>
-        </div>
-        <div class="activity-token-hint">
-          Configure your OpenClaw plugin with:<br/>
-          <code>OC_POLICY_SERVER_URL=https://policy.lewtucker.net</code><br/>
-          <code>OC_POLICY_AGENT_TOKEN=&lt;your token&gt;</code>
-        </div>
-      </div>
 
       <!-- Activity log -->
       <div class="activity-log-card">
@@ -833,6 +892,7 @@
     if (name === 'rulemaker') loadSkillPreview();
     if (name === 'activity') startActivityPolling();
     if (name === 'approvals') startApprovalsPolling();
+    if (name === 'profile') loadProfile();
   }
 
   function navTo(name) {
@@ -1556,6 +1616,58 @@
     }
   }
 
+  // ── Profile ────────────────────────────────────────────────────────────────
+
+  async function loadProfile() {
+    const res = await api('GET', '/me');
+    if (res && res.ok) {
+      const data = await res.json();
+      document.getElementById('profile-email').textContent = data.email;
+      document.getElementById('profile-created').textContent =
+        new Date(data.created_at).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+    }
+    // Load token into profile card
+    const res2 = await api('GET', '/token');
+    if (res2 && res2.ok) {
+      const data = await res2.json();
+      _currentToken = data.token;
+      renderToken(_currentToken);
+    }
+  }
+
+  async function changePassword() {
+    const current  = document.getElementById('profile-current-pw').value;
+    const newPw    = document.getElementById('profile-new-pw').value;
+    const confirm  = document.getElementById('profile-confirm-pw').value;
+    const errEl    = document.getElementById('profile-pw-error');
+    const okEl     = document.getElementById('profile-pw-success');
+
+    errEl.textContent = ''; errEl.classList.remove('show');
+    okEl.textContent  = ''; okEl.classList.remove('show');
+
+    if (!current || !newPw || !confirm) {
+      errEl.textContent = 'All fields are required.'; errEl.classList.add('show'); return;
+    }
+    if (newPw !== confirm) {
+      errEl.textContent = 'New passwords do not match.'; errEl.classList.add('show'); return;
+    }
+    if (newPw.length < 8) {
+      errEl.textContent = 'New password must be at least 8 characters.'; errEl.classList.add('show'); return;
+    }
+
+    const res = await api('POST', '/profile/password', { current_password: current, new_password: newPw });
+    if (!res) return;
+    if (res.ok) {
+      document.getElementById('profile-current-pw').value = '';
+      document.getElementById('profile-new-pw').value = '';
+      document.getElementById('profile-confirm-pw').value = '';
+      okEl.textContent = 'Password updated successfully.'; okEl.classList.add('show');
+    } else {
+      const data = await res.json().catch(() => ({}));
+      errEl.textContent = data.detail || 'Failed to update password.'; errEl.classList.add('show');
+    }
+  }
+
   // ── Activity & Token ───────────────────────────────────────────────────────
 
   let _currentToken = null;
@@ -1563,10 +1675,6 @@
   let _lastSeenActivityId = null;   // newest row id from last render
 
   function startActivityPolling() {
-    // Load token once, then start polling the log
-    api('GET', '/token').then(res => {
-      if (res && res.ok) res.json().then(d => { _currentToken = d.token; renderToken(_currentToken); });
-    });
     document.getElementById('activity-live-indicator').style.display = '';
     pollActivity();  // immediate first fetch
     _activityPollTimer = setInterval(pollActivity, 10000);

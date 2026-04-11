@@ -468,6 +468,40 @@ async def clear_activity(request: Request):
 
 # ── OpenClaw /check endpoint ──────────────────────────────────────────────────
 
+def _resolve_caller(caller_id: str, people: list) -> dict | None:
+    """
+    Match caller_id against the people roster using multiple strategies, in order:
+    1. Exact telegram_id match      e.g. "tg:6741893378"
+    2. person_id match              e.g. "lew"
+    3. Full name match              e.g. "Lew Tucker"
+    4. First word of name match     e.g. "Lew"
+    All name/id comparisons are case-insensitive.
+    """
+    needle = caller_id.strip().lower()
+
+    # 1. Telegram ID (exact)
+    for p in people:
+        if p.get("telegram_id", "").lower() == needle:
+            return p
+
+    # 2. Person ID
+    for p in people:
+        if p.get("person_id", "").strip().lower() == needle:
+            return p
+
+    # 3. Full name
+    for p in people:
+        if p.get("name", "").strip().lower() == needle:
+            return p
+
+    # 4. First word of name
+    for p in people:
+        first = p.get("name", "").strip().lower().split()[0] if p.get("name") else ""
+        if first and first == needle:
+            return p
+
+    return None
+
 class CheckRequest(BaseModel):
     tool: str
     params: dict = {}
@@ -503,7 +537,7 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
     person_groups = [body.group] if body.group else []
     if caller_id:
         people = database.get_people(email)
-        matched_person = next((p for p in people if p.get("telegram_id") == caller_id), None)
+        matched_person = _resolve_caller(caller_id, people)
         if matched_person:
             person_name = matched_person.get("name", person_name)
             person_groups = matched_person.get("groups", person_groups)

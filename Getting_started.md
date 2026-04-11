@@ -80,7 +80,7 @@ All `match` fields are optional and AND-ed together. An empty `match: {}` matche
 **Priority guidance:**
 
 | Specificity | Suggested range |
-|-------------|----------------|
+| ----------- | --------------- |
 | Person + tool + program | 65–75 |
 | Group + tool | 45–55 |
 | Tool + program | 30–40 |
@@ -101,13 +101,14 @@ The **Test Action** tab lets you simulate any hypothetical agent request against
 
 Fill in the Mad Libs form:
 
-```
+```text
 [ person ]  in group  [ group ]  calls  [ tool ]  [ program ]  on path  [ path ]
 ```
 
 All fields are optional — leave blank to test as an anonymous caller or without specifying a program. Click **Evaluate** to run the simulation.
 
 The result shows:
+
 - **Verdict block** — allow (green), deny (red), or pending (yellow), with the matching rule name
 - **Evaluation trace** — every rule in priority order, with a per-condition breakdown showing exactly which conditions matched or missed
 
@@ -118,7 +119,7 @@ The last 5 test results are kept on screen so you can compare how different inpu
 The **Analyze** panel on the Policy Rules tab runs automatic checks against your full rule set:
 
 | Check | What it means |
-|-------|--------------|
+| ----- | ------------- |
 | **shadow** | A higher-priority rule makes a lower rule unreachable |
 | **conflict** | Two rules at equal priority match the same conditions but disagree on the result |
 | **orphan** | A rule references a person or group that isn't in the People roster |
@@ -130,6 +131,23 @@ The **Analyze** panel on the Policy Rules tab runs automatic checks against your
 ## Part 4: Connecting a Live Agent (OpenClaw / nanoclaw)
 
 Policy Maker can act as a real-time policy server for any AI agent that can make HTTP calls. The integration uses a single `/check` endpoint and a Bearer token.
+
+### How the token works
+
+Every request to `/check` carries a Bearer token in the `Authorization` header. The server uses that token to look up which user account it belongs to, then loads and evaluates **that user's** rule set. The token therefore does two things at once:
+
+- **Authenticates** the request (only known tokens are accepted)
+- **Routes** the request to the right policy set (each token maps to exactly one user's rules)
+
+This makes Policy Maker naturally multi-user. A single shared server can govern multiple independent agent deployments simultaneously — each agent is configured with a different token, and each token owner maintains their own rules, people roster, and activity log completely independently. No agent can see or affect another user's policy.
+
+```
+Agent A  → Bearer token-A  →  User A's rule set  →  User A's activity log
+Agent B  → Bearer token-B  →  User B's rule set  →  User B's activity log
+Agent C  → Bearer token-C  →  User C's rule set  →  User C's activity log
+```
+
+To add a new monitored system: create a Policy Maker account for it (any email), generate a token on the Activity tab, and give that token to the agent. Everything else — rules, people, activity — is scoped to that account automatically.
 
 ### Step 1: Generate an agent token
 
@@ -152,7 +170,7 @@ The nanoclaw hook will include these automatically in every request it sends to 
 
 In your agent's hook configuration, add the policy check hook. The hook runs before each tool call and calls Policy Maker's `/check` endpoint:
 
-```
+```http
 POST /check
 Authorization: Bearer <OC_POLICY_AGENT_TOKEN>
 
@@ -180,7 +198,7 @@ If verdict is `deny`, the hook should block the tool call and return an error to
 For person- or group-scoped rules to work, you need to tell Policy Maker who is who. On the **Policy Rules** tab, scroll to the **People & Groups** panel and add each person:
 
 | Field | Example | Notes |
-|-------|---------|-------|
+| ----- | ------- | ----- |
 | **Name** | Lew Tucker | Display name only |
 | **Person ID** | lew | Short ID used in rule `person:` fields |
 | **Groups** | engineering, admin | Comma-separated group names |
@@ -246,4 +264,4 @@ policies:
     match: {}
 ```
 
-Rules are evaluated top-to-bottom by priority. The first match wins. An admin calling `git push` hits `allow-admin` (priority 90) and is allowed without reaching the git-specific rule. An engineer running `rm -rf` hits `deny-rm-rf` (priority 80) before the allow-admin rule doesn't apply (they're not an admin), so they're denied.
+Rules are evaluated top-to-bottom by priority. The first match wins. An admin calling `git push` hits `allow-admin` (priority 90) and is allowed. An engineer running `rm -rf` hits `deny-rm-rf` (priority 80) and is denied before any other rule is considered.

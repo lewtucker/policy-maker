@@ -249,6 +249,25 @@
     .muted { color: var(--muted); }
     .mono  { font-family: var(--mono); }
 
+    /* ── Approval badge ── */
+    .approval-badge { position:absolute; top:6px; right:10px; background:var(--red); color:#fff; font-size:10px; font-weight:700; border-radius:9px; padding:1px 6px; line-height:14px; }
+    /* ── Approval cards ── */
+    .approval-list { display:flex; flex-direction:column; gap:12px; }
+    .approval-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px 18px; transition:opacity .3s; }
+    .approval-card.resolving { opacity:.35; pointer-events:none; }
+    .approval-meta { display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+    .approval-tool { font-family:var(--mono); font-size:12px; background:var(--surface2); padding:2px 7px; border-radius:4px; color:var(--text-dim); }
+    .approval-age { font-size:11px; color:var(--muted); margin-left:auto; }
+    .approval-command { font-family:var(--mono); font-size:13px; color:var(--text); margin-bottom:6px; word-break:break-all; }
+    .approval-rule { font-size:12px; color:var(--muted); margin-bottom:14px; }
+    .approval-actions { display:flex; gap:8px; }
+    .btn-approve { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); color:#22c55e; border-radius:6px; padding:6px 14px; font-size:13px; cursor:pointer; font-weight:500; }
+    .btn-approve:hover { background:rgba(34,197,94,.22); }
+    .btn-deny-ap { background:rgba(239,68,68,.10); border:1px solid rgba(239,68,68,.35); color:var(--red); border-radius:6px; padding:6px 14px; font-size:13px; cursor:pointer; font-weight:500; }
+    .btn-deny-ap:hover { background:rgba(239,68,68,.18); }
+    .approval-resolved { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:4px 10px; border-radius:5px; }
+    .approval-resolved.allow { background:rgba(34,197,94,.1); color:#22c55e; }
+    .approval-resolved.deny { background:rgba(239,68,68,.1); color:var(--red); }
     /* ── Activity page ── */
     .activity-token-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; flex-shrink: 0; }
     .activity-token-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 10px; }
@@ -308,6 +327,10 @@
     </div>
     <div class="nav-item" id="nav-policies" onclick="showPage('policies',this)">
       <span class="nav-icon">📋</span> Policy Rules
+    </div>
+    <div class="nav-item" id="nav-approvals" onclick="showPage('approvals',this)" style="position:relative;">
+      <span class="nav-icon">⏳</span> Approvals
+      <span class="approval-badge" id="approval-badge" style="display:none;"></span>
     </div>
     <div class="nav-item" id="nav-activity" onclick="showPage('activity',this)">
       <span class="nav-icon">⚡</span> Activity
@@ -590,6 +613,23 @@
     </div>
   </div>
 
+  <!-- ── Approvals page ── -->
+  <div class="page" id="page-approvals">
+    <div class="page-header">
+      <div class="page-title-block">
+        <div class="page-title">Approvals</div>
+        <div class="page-sub" id="approvals-sub">Pending requests that matched a <em>pending</em> rule — approve or deny each one.</div>
+      </div>
+      <button class="btn-secondary" onclick="loadApprovals()">↺ Refresh</button>
+    </div>
+    <div class="page-body" style="display:flex;flex-direction:column;gap:16px;padding-top:16px;">
+      <div class="banner error" id="approvals-error"></div>
+      <div class="approval-list" id="approval-list">
+        <div class="activity-empty">Loading…</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Activity page ── -->
   <div class="page" id="page-activity">
     <div class="page-header">
@@ -785,12 +825,14 @@
   // ── Page nav ───────────────────────────────────────────────────────────────
   function showPage(name, el) {
     stopActivityPolling();
+    stopApprovalsPolling();
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('page-' + name).classList.add('active');
     el.classList.add('active');
     if (name === 'rulemaker') loadSkillPreview();
     if (name === 'activity') startActivityPolling();
+    if (name === 'approvals') startApprovalsPolling();
   }
 
   function navTo(name) {
@@ -822,6 +864,9 @@
     loadPeople();
     resetChat();
     document.querySelectorAll('.sim-inline').forEach(autosize);
+    // Poll approval badge every 30s regardless of which tab is active
+    refreshApprovalBadge();
+    setInterval(refreshApprovalBadge, 30000);
   }
 
   // ── People & Groups ────────────────────────────────────────────────────────
@@ -1385,6 +1430,130 @@
     }
 
     pane.innerHTML = html;
+  }
+
+  // ── Approvals ──────────────────────────────────────────────────────────────
+
+  let _approvalsPollTimer = null;
+
+  function startApprovalsPolling() {
+    loadApprovals();
+    _approvalsPollTimer = setInterval(loadApprovals, 8000);
+  }
+
+  function stopApprovalsPolling() {
+    if (_approvalsPollTimer) { clearInterval(_approvalsPollTimer); _approvalsPollTimer = null; }
+  }
+
+  async function loadApprovals() {
+    const res = await api('GET', '/approvals');
+    if (!res || !res.ok) return;
+    const data = await res.json();
+    renderApprovals(data.approvals || []);
+  }
+
+  function renderApprovals(approvals) {
+    const list = document.getElementById('approval-list');
+    const sub  = document.getElementById('approvals-sub');
+    const badge = document.getElementById('approval-badge');
+    if (!list) return;
+
+    const pending = approvals.filter(a => !a.verdict);
+    const resolved = approvals.filter(a => a.verdict);
+
+    // Update nav badge
+    if (pending.length > 0) {
+      badge.textContent = pending.length;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    if (!approvals.length) {
+      sub.textContent = 'No pending requests — everything is flowing freely.';
+      list.innerHTML = '<div class="activity-empty">No approval requests yet. They appear here when an agent action matches a <em>pending</em> rule.</div>';
+      return;
+    }
+
+    sub.textContent = pending.length
+      ? `${pending.length} request${pending.length === 1 ? '' : 's'} waiting for review`
+      : 'No pending requests';
+
+    // Preserve resolving state across re-renders
+    const resolving = new Set(
+      [...list.querySelectorAll('.approval-card.resolving')].map(c => c.dataset.id)
+    );
+
+    const renderCard = a => {
+      const isPending = !a.verdict;
+      const age = relTime(a.created_at);
+      let paramsObj = {};
+      try { paramsObj = JSON.parse(a.params_json); } catch(e) {}
+      const cmd = paramsObj.command || paramsObj.path || JSON.stringify(paramsObj);
+      const cls = resolving.has(a.id) ? ' resolving' : '';
+
+      const actionsHtml = isPending
+        ? `<div class="approval-actions">
+             <button class="btn-approve" onclick="resolveApproval('${a.id}','allow',this)">Approve</button>
+             <button class="btn-deny-ap" onclick="resolveApproval('${a.id}','deny',this)">Deny</button>
+           </div>`
+        : `<div class="approval-resolved ${a.verdict}">
+             ${a.verdict === 'allow' ? '✓ Approved' : '✕ Denied'}
+             ${a.reason ? `<span class="muted" style="font-weight:400;">— ${esc(a.reason)}</span>` : ''}
+           </div>`;
+
+      return `<div class="approval-card${cls}" data-id="${esc(a.id)}">
+        <div class="approval-meta">
+          <span class="approval-tool">${esc(a.tool)}</span>
+          ${a.subject_id ? `<span style="font-size:12px;color:var(--text-dim);">👤 ${esc(a.subject_id)}</span>` : ''}
+          ${a.rule_name  ? `<span style="font-size:12px;color:var(--muted);">rule: ${esc(a.rule_name)}</span>` : ''}
+          <span class="approval-age">${esc(age)}</span>
+        </div>
+        <div class="approval-command">${esc(cmd)}</div>
+        ${actionsHtml}
+      </div>`;
+    };
+
+    // Pending cards first, then resolved
+    list.innerHTML = [...pending, ...resolved].map(renderCard).join('');
+  }
+
+  async function resolveApproval(id, verdict, btn) {
+    const card = btn.closest('.approval-card');
+    card.classList.add('resolving');
+    const res = await api('POST', '/approvals/' + id, { verdict });
+    if (!res || !res.ok) {
+      card.classList.remove('resolving');
+      return;
+    }
+    // Refresh the list to show updated state
+    loadApprovals();
+  }
+
+  function relTime(isoStr) {
+    const diff = Date.now() - new Date(isoStr).getTime();
+    const s = Math.floor(diff / 1000);
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
+  // Poll badge count even when not on the Approvals tab
+  async function refreshApprovalBadge() {
+    const res = await api('GET', '/approvals/count');
+    if (!res || !res.ok) return;
+    const data = await res.json();
+    const badge = document.getElementById('approval-badge');
+    if (!badge) return;
+    if (data.pending > 0) {
+      badge.textContent = data.pending;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
   }
 
   // ── Activity & Token ───────────────────────────────────────────────────────

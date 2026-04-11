@@ -6,6 +6,7 @@ import os
 import json
 import secrets
 import tempfile
+import uuid
 import yaml
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -534,8 +535,8 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
 
     # Log the call (include resolved identity in params for display)
     log_params = dict(body.params)
-    if body.channel_id:
-        log_params["_caller"] = person_name or body.channel_id
+    if caller_id:
+        log_params["_caller"] = person_id_str or caller_id
     database.log_check(
         email=email,
         tool=body.tool,
@@ -545,6 +546,20 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
         rule_name=rule_name,
     )
 
+    # For pending verdicts, create an approval record the admin can resolve
+    approval_id = None
+    if verdict == "pending":
+        approval_id = str(uuid.uuid4())
+        database.create_approval(
+            email=email,
+            approval_id=approval_id,
+            tool=body.tool,
+            params_json=json.dumps(log_params),
+            rule_id=rule_id,
+            rule_name=rule_name,
+            subject_id=person_id_str.lower() if person_id_str else None,
+        )
+
     if verdict == "no-match":
         return {"verdict": "deny", "reason": "No policy matched — failing closed"}
     if verdict == "allow":
@@ -552,9 +567,63 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
     if verdict == "deny":
         return {"verdict": "deny", "reason": f"Denied by '{rule_name or rule_id}'"}
     if verdict == "pending":
-        return {"verdict": "pending", "reason": f"Pending approval — '{rule_name or rule_id}'"}
+        return {
+            "verdict": "pending",
+            "reason": f"Pending approval — '{rule_name or rule_id}'",
+            "approval_id": approval_id,
+        }
 
     return {"verdict": "deny", "reason": "Unknown verdict"}
+
+
+# ── Approval endpoints ────────────────────────────────────────────────────────
+
+@app.get("/approvals")
+async def list_approvals(request: Request, pending_only: bool = False):
+    email = _require_session(request)
+    rows = database.list_approvals(email, pending_only=pending_only)
+    return {"approvals": [dict(r) for r in rows]}
+
+
+@app.get("/approvals/count")
+async def approval_count(request: Request):
+    email = _require_session(request)
+    return {"pending": database.count_pending_approvals(email)}
+
+
+@app.get("/approvals/{approval_id}")
+async def get_approval(approval_id: str, request: Request,
+                       authorization: str = Header(default="")):
+    """Accessible by session (admin) or Bearer token (agent polling for resolution)."""
+    email = request.session.get("email")
+    if not email and authorization.startswith("Bearer "):
+        token = authorization[len("Bearer "):]
+        email = database.get_email_by_token(token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    row = database.get_approval(approval_id)
+    if row is None or row["email"] != email:
+        raise HTTPException(status_code=404, detail="Approval not found")
+    return dict(row)
+
+
+class ResolveBody(BaseModel):
+    verdict: str          # "allow" | "deny"
+    reason: str = ""
+
+
+@app.post("/approvals/{approval_id}")
+async def resolve_approval(approval_id: str, body: ResolveBody, request: Request):
+    email = _require_session(request)
+    if body.verdict not in ("allow", "deny"):
+        raise HTTPException(status_code=400, detail="verdict must be 'allow' or 'deny'")
+    row = database.get_approval(approval_id)
+    if row is None or row["email"] != email:
+        raise HTTPException(status_code=404, detail="Approval not found")
+    updated = database.resolve_approval(approval_id, body.verdict, body.reason or None)
+    if updated is None:
+        raise HTTPException(status_code=409, detail="Already resolved")
+    return dict(updated)
 
 
 # ── Static files ──────────────────────────────────────────────────────────────

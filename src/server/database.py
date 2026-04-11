@@ -46,6 +46,21 @@ def init_db() -> None:
                 rule_name   TEXT
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS approvals (
+                id          TEXT PRIMARY KEY,
+                email       TEXT NOT NULL,
+                tool        TEXT NOT NULL,
+                params_json TEXT NOT NULL DEFAULT '{}',
+                rule_id     TEXT,
+                rule_name   TEXT,
+                subject_id  TEXT,
+                created_at  TEXT NOT NULL,
+                verdict     TEXT,
+                reason      TEXT,
+                resolved_at TEXT
+            )
+        """)
         # Migrations for existing DBs
         for col, definition in [
             ("agent_token", "TEXT"),
@@ -180,3 +195,61 @@ def clear_check_log(email: str) -> None:
     with _conn() as conn:
         conn.execute("DELETE FROM check_log WHERE email = ?", (email,))
         conn.commit()
+
+
+# ── Approvals ─────────────────────────────────────────────────────────────────
+
+def create_approval(email: str, approval_id: str, tool: str, params_json: str,
+                    rule_id: str | None, rule_name: str | None, subject_id: str | None) -> None:
+    with _conn() as conn:
+        conn.execute(
+            """INSERT INTO approvals
+               (id, email, tool, params_json, rule_id, rule_name, subject_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (approval_id, email, tool, params_json, rule_id, rule_name, subject_id,
+             datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+
+
+def get_approval(approval_id: str) -> sqlite3.Row | None:
+    with _conn() as conn:
+        return conn.execute(
+            "SELECT * FROM approvals WHERE id = ?", (approval_id,)
+        ).fetchone()
+
+
+def resolve_approval(approval_id: str, verdict: str, reason: str | None) -> sqlite3.Row | None:
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM approvals WHERE id = ? AND verdict IS NULL", (approval_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        conn.execute(
+            "UPDATE approvals SET verdict = ?, reason = ?, resolved_at = ? WHERE id = ?",
+            (verdict, reason, datetime.now(timezone.utc).isoformat(), approval_id),
+        )
+        conn.commit()
+        return conn.execute("SELECT * FROM approvals WHERE id = ?", (approval_id,)).fetchone()
+
+
+def list_approvals(email: str, pending_only: bool = False) -> list[sqlite3.Row]:
+    with _conn() as conn:
+        if pending_only:
+            return conn.execute(
+                "SELECT * FROM approvals WHERE email = ? AND verdict IS NULL ORDER BY created_at DESC",
+                (email,),
+            ).fetchall()
+        return conn.execute(
+            "SELECT * FROM approvals WHERE email = ? ORDER BY created_at DESC LIMIT 200",
+            (email,),
+        ).fetchall()
+
+
+def count_pending_approvals(email: str) -> int:
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM approvals WHERE email = ? AND verdict IS NULL", (email,)
+        ).fetchone()
+        return row[0] if row else 0

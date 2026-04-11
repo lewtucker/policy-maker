@@ -263,15 +263,20 @@
     .activity-log-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex: 1; display: flex; flex-direction: column; min-height: 0; }
     .activity-log-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); flex-shrink: 0; }
     .activity-empty { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
-    .activity-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .activity-table th { text-align: left; padding: 8px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--border); background: var(--surface2); }
-    .activity-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); color: var(--text-dim); vertical-align: middle; }
-    .activity-table tr:last-child td { border-bottom: none; }
-    .activity-table tr:hover td { background: var(--surface2); }
-    .activity-ts { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
-    .activity-tool { font-family: var(--mono); font-size: 12px; }
-    .activity-params { font-family: var(--mono); font-size: 11px; color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .activity-rule { font-size: 12px; color: var(--text-dim); }
+    .activity-row { border-bottom: 1px solid var(--border); }
+    .activity-row:last-child { border-bottom: none; }
+    .activity-row summary { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; list-style: none; font-size: 13px; }
+    .activity-row summary::-webkit-details-marker { display: none; }
+    .activity-row summary:hover { background: var(--surface2); }
+    .activity-chevron { font-size: 10px; color: var(--muted); flex-shrink: 0; transition: transform .15s; }
+    details.activity-row[open] .activity-chevron { transform: rotate(90deg); }
+    .activity-ts { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .activity-tool { font-family: var(--mono); font-size: 12px; flex-shrink: 0; min-width: 60px; }
+    .activity-params { font-family: var(--mono); font-size: 11px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-rule { font-size: 12px; color: var(--text-dim); flex-shrink: 0; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-detail { padding: 10px 14px 14px 14px; background: var(--surface2); border-top: 1px solid var(--border); }
+    .activity-detail pre { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--text-dim); white-space: pre-wrap; word-break: break-all; }
+    .activity-detail-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
   </style>
 </head>
 <body>
@@ -1439,22 +1444,26 @@
     };
     const rows_html = rows.map(r => {
       const ts = new Date(r.ts).toLocaleString();
-      let params = '';
-      try { params = Object.entries(JSON.parse(r.params_json)).map(([k,v]) => `${k}=${v}`).join(' · '); } catch(e) {}
-      return `<tr>
-        <td class="activity-ts">${esc(ts)}</td>
-        <td class="activity-tool">${esc(r.tool)}</td>
-        <td class="activity-params" title="${esc(params)}">${esc(params) || '—'}</td>
-        <td>${verdictPill(r.verdict)}</td>
-        <td class="activity-rule">${esc(r.rule_name || r.rule_id || '—')}</td>
-      </tr>`;
+      let paramsObj = {};
+      try { paramsObj = JSON.parse(r.params_json); } catch(e) {}
+      const paramsSummary = Object.entries(paramsObj).map(([k,v]) => `${k}=${v}`).join(' · ');
+      const detail = JSON.stringify({ tool: r.tool, params: paramsObj, verdict: r.verdict, rule: r.rule_name || r.rule_id || null }, null, 2);
+      return `<details class="activity-row">
+        <summary>
+          <span class="activity-chevron">▶</span>
+          <span class="activity-ts">${esc(ts)}</span>
+          <span class="activity-tool">${esc(r.tool)}</span>
+          <span class="activity-params">${esc(paramsSummary) || '—'}</span>
+          ${verdictPill(r.verdict)}
+          <span class="activity-rule">${esc(r.rule_name || r.rule_id || '—')}</span>
+        </summary>
+        <div class="activity-detail">
+          <div class="activity-detail-label">Full request</div>
+          <pre>${esc(detail)}</pre>
+        </div>
+      </details>`;
     }).join('');
-    body.innerHTML = `<table class="activity-table">
-      <thead><tr>
-        <th>Time</th><th>Tool</th><th>Params</th><th>Verdict</th><th>Matched Rule</th>
-      </tr></thead>
-      <tbody>${rows_html}</tbody>
-    </table>`;
+    body.innerHTML = `<div style="overflow-y:auto;">${rows_html}</div>`;
   }
 
   // ── Modal helpers ──────────────────────────────────────────────────────────

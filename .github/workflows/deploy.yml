@@ -3,6 +3,9 @@ name: Deploy to production
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:

@@ -159,13 +159,13 @@ Agent B  → Bearer token-B  →  User B's rule set  →  User B's activity log
 Agent C  → Bearer token-C  →  User C's rule set  →  User C's activity log
 ```
 
-To add a new monitored system: create a Policy Maker account for it (any email), generate a token on the Activity tab, and give that token to the agent. Everything else — rules, people, activity — is scoped to that account automatically.
+To add a new monitored system: create a Policy Maker account for it (any email), generate a token on the **Profile** page, and give that token to the agent. Everything else — rules, people, activity — is scoped to that account automatically.
 
 ### Step 1: Generate an agent token
 
-On the **Activity** tab, click **Generate** in the Agent Token section. Copy the token — you'll add it to your agent's configuration.
+Click your **email address** in the bottom-left of the sidebar to open your Profile page. Scroll to the **Agent Token** section and click **Generate**. Copy the token — you'll add it to your agent's configuration.
 
-If you prefer to use your own token string, type it in the field and click **Save**.
+If you prefer to use your own token string, type it into the field and click **Save**.
 
 ### Step 2: Configure your agent
 

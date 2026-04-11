@@ -458,6 +458,13 @@ async def get_activity(request: Request, limit: int = 50):
     return {"activity": [dict(r) for r in rows]}
 
 
+@app.delete("/activity")
+async def clear_activity(request: Request):
+    email = _require_session(request)
+    database.clear_check_log(email)
+    return {"cleared": True}
+
+
 # ── OpenClaw /check endpoint ──────────────────────────────────────────────────
 
 class CheckRequest(BaseModel):

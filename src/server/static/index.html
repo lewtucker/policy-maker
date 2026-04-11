@@ -277,6 +277,15 @@
     .activity-detail { padding: 10px 14px 14px 14px; background: var(--surface2); border-top: 1px solid var(--border); }
     .activity-detail pre { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--text-dim); white-space: pre-wrap; word-break: break-all; }
     .activity-detail-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+    /* Busy dots live indicator */
+    .activity-live { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+    .activity-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse-dot 1.4s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+    /* Flash new rows */
+    .activity-row-new { animation: feed-flash 2s ease-out forwards; }
+    @keyframes feed-flash { 0% { background: rgba(234,179,8,.25); } 100% { background: transparent; } }
+    /* Scrollable log body */
+    .activity-log-scroll { overflow-y: auto; flex: 1; min-height: 0; }
   </style>
 </head>
 <body>
@@ -590,7 +599,7 @@
       </div>
       <button class="btn-secondary" onclick="loadActivity()">↺ Refresh</button>
     </div>
-    <div class="page-body" style="display:flex;flex-direction:column;gap:20px;padding-top:16px;">
+    <div class="page-body" style="display:flex;flex-direction:column;gap:20px;padding-top:16px;overflow:hidden;flex:1;min-height:0;">
 
       <!-- Token management -->
       <div class="activity-token-card">
@@ -613,9 +622,15 @@
       <div class="activity-log-card">
         <div class="activity-log-header">
           <span>Recent evaluations</span>
-          <span id="activity-count" style="font-weight:400;color:var(--muted);font-size:12px;"></span>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span id="activity-live-indicator" class="activity-live" style="display:none;">
+              <span class="activity-live-dot"></span> Live
+            </span>
+            <span id="activity-count" style="font-weight:400;color:var(--muted);font-size:12px;"></span>
+            <button class="btn btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="clearActivityLog()">Clear</button>
+          </div>
         </div>
-        <div id="activity-log-body">
+        <div id="activity-log-body" class="activity-log-scroll">
           <div class="activity-empty">No activity yet — evaluations from your OpenClaw agent will appear here.</div>
         </div>
       </div>
@@ -769,12 +784,13 @@
 
   // ── Page nav ───────────────────────────────────────────────────────────────
   function showPage(name, el) {
+    stopActivityPolling();
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('page-' + name).classList.add('active');
     el.classList.add('active');
     if (name === 'rulemaker') loadSkillPreview();
-    if (name === 'activity') loadActivity();
+    if (name === 'activity') startActivityPolling();
   }
 
   function navTo(name) {
@@ -1374,20 +1390,42 @@
   // ── Activity & Token ───────────────────────────────────────────────────────
 
   let _currentToken = null;
+  let _activityPollTimer = null;
+  let _lastSeenActivityId = null;   // newest row id from last render
 
-  async function loadActivity() {
-    const res = await api('GET', '/token');
+  function startActivityPolling() {
+    // Load token once, then start polling the log
+    api('GET', '/token').then(res => {
+      if (res && res.ok) res.json().then(d => { _currentToken = d.token; renderToken(_currentToken); });
+    });
+    document.getElementById('activity-live-indicator').style.display = '';
+    pollActivity();  // immediate first fetch
+    _activityPollTimer = setInterval(pollActivity, 10000);
+  }
+
+  function stopActivityPolling() {
+    if (_activityPollTimer) { clearInterval(_activityPollTimer); _activityPollTimer = null; }
+    const ind = document.getElementById('activity-live-indicator');
+    if (ind) ind.style.display = 'none';
+  }
+
+  async function pollActivity() {
+    const res = await api('GET', '/activity?limit=200');
     if (res && res.ok) {
       const data = await res.json();
-      _currentToken = data.token;
-      renderToken(_currentToken);
-    }
-    const res2 = await api('GET', '/activity?limit=100');
-    if (res2 && res2.ok) {
-      const data = await res2.json();
       renderActivityLog(data.activity);
     }
   }
+
+  async function clearActivityLog() {
+    if (!confirm('Clear all activity logs?')) return;
+    await api('DELETE', '/activity');
+    _lastSeenActivityId = null;
+    pollActivity();
+  }
+
+  // Kept for the Refresh button in the page header
+  function loadActivity() { pollActivity(); }
 
   function renderToken(token) {
     const input = document.getElementById('token-input');
@@ -1444,22 +1482,36 @@
     if (!rows || rows.length === 0) {
       body.innerHTML = '<div class="activity-empty">No activity yet — evaluations from your OpenClaw agent will appear here.</div>';
       count.textContent = '';
+      _lastSeenActivityId = null;
       return;
     }
     count.textContent = `${rows.length} event${rows.length === 1 ? '' : 's'}`;
+    const newestId = rows[0].id;
+    const hasNew = newestId !== _lastSeenActivityId && _lastSeenActivityId !== null;
+    const prevIdx = _lastSeenActivityId ? rows.findIndex(r => r.id === _lastSeenActivityId) : -1;
+
     const verdictPill = v => {
       if (v === 'allow')   return `<span class="pill allow" style="font-size:10px;">allow</span>`;
       if (v === 'deny')    return `<span class="pill deny" style="font-size:10px;">deny</span>`;
       if (v === 'pending') return `<span class="pill pending" style="font-size:10px;">pending</span>`;
       return `<span class="pill" style="font-size:10px;background:var(--surface2);color:var(--muted);">no-match</span>`;
     };
-    const rows_html = rows.map(r => {
+
+    // Preserve open <details> state across re-renders
+    const openIds = new Set();
+    body.querySelectorAll('details.activity-row[open]').forEach(el => {
+      openIds.add(el.dataset.rowId);
+    });
+
+    const rows_html = rows.map((r, i) => {
+      const isNew = hasNew && (prevIdx === -1 ? i === 0 : i < prevIdx);
       const ts = new Date(r.ts).toLocaleString();
       let paramsObj = {};
       try { paramsObj = JSON.parse(r.params_json); } catch(e) {}
       const paramsSummary = Object.entries(paramsObj).map(([k,v]) => `${k}=${v}`).join(' · ');
       const detail = JSON.stringify({ tool: r.tool, params: paramsObj, verdict: r.verdict, rule: r.rule_name || r.rule_id || null }, null, 2);
-      return `<details class="activity-row">
+      const isOpen = openIds.has(String(r.id));
+      return `<details class="activity-row${isNew ? ' activity-row-new' : ''}" data-row-id="${r.id}"${isOpen ? ' open' : ''}>
         <summary>
           <span class="activity-chevron">▶</span>
           <span class="activity-ts">${esc(ts)}</span>
@@ -1474,7 +1526,13 @@
         </div>
       </details>`;
     }).join('');
-    body.innerHTML = `<div style="overflow-y:auto;">${rows_html}</div>`;
+
+    body.innerHTML = rows_html;
+
+    // Scroll to top when new rows arrive
+    if (hasNew) body.scrollTop = 0;
+
+    _lastSeenActivityId = newestId;
   }
 
   // ── Modal helpers ──────────────────────────────────────────────────────────

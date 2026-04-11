@@ -174,3 +174,9 @@ def get_check_log(email: str, limit: int = 50) -> list[sqlite3.Row]:
                ORDER BY id DESC LIMIT ?""",
             (email, limit),
         ).fetchall()
+
+
+def clear_check_log(email: str) -> None:
+    with _conn() as conn:
+        conn.execute("DELETE FROM check_log WHERE email = ?", (email,))
+        conn.commit()

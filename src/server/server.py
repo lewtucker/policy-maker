@@ -3,6 +3,7 @@ Policy Maker Server
 FastAPI app with session auth, per-user SQLite storage, and policy evaluation.
 """
 import os
+import json
 import secrets
 import tempfile
 import yaml
@@ -12,7 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
 
-from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
@@ -366,6 +367,99 @@ chat_router = create_chat_handler(
     get_skill_fn=_resolve_skill,
 )
 app.include_router(chat_router)
+
+
+# ── Agent token endpoints ─────────────────────────────────────────────────────
+
+@app.get("/token")
+async def get_token(request: Request):
+    email = _require_session(request)
+    token = database.get_agent_token(email)
+    return {"token": token}
+
+
+@app.post("/token/generate")
+async def generate_token(request: Request):
+    email = _require_session(request)
+    token = secrets.token_hex(32)
+    database.save_agent_token(email, token)
+    return {"token": token}
+
+
+@app.delete("/token")
+async def revoke_token(request: Request):
+    email = _require_session(request)
+    database.save_agent_token(email, None)
+    return {"revoked": True}
+
+
+# ── Activity log endpoint ─────────────────────────────────────────────────────
+
+@app.get("/activity")
+async def get_activity(request: Request, limit: int = 50):
+    email = _require_session(request)
+    rows = database.get_check_log(email, limit=min(limit, 200))
+    return {"activity": [dict(r) for r in rows]}
+
+
+# ── OpenClaw /check endpoint ──────────────────────────────────────────────────
+
+class CheckRequest(BaseModel):
+    tool: str
+    params: dict = {}
+
+
+@app.post("/check")
+async def check(body: CheckRequest, authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Bearer token required")
+    token = authorization[len("Bearer "):]
+    email = database.get_email_by_token(token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid agent token")
+
+    engine = _get_engine(email)
+
+    # Build params matching policy_engine expectations
+    params = {}
+    command = body.params.get("command", "")
+    if command:
+        params["command"] = command
+    path = body.params.get("path", "")
+    if path:
+        params["path"] = path
+
+    # Find first matching rule
+    verdict = "no-match"
+    rule_id = None
+    rule_name = None
+    for rule in engine.rules:
+        if engine._matches(rule, body.tool, params, None):
+            verdict = rule.result
+            rule_id = rule.id
+            rule_name = rule.name
+            break
+
+    # Log the call
+    database.log_check(
+        email=email,
+        tool=body.tool,
+        params_json=json.dumps(body.params),
+        verdict=verdict,
+        rule_id=rule_id,
+        rule_name=rule_name,
+    )
+
+    if verdict == "no-match":
+        return {"verdict": "deny", "reason": "No policy matched — failing closed"}
+    if verdict == "allow":
+        return {"verdict": "allow", "reason": f"Allowed by '{rule_name or rule_id}'"}
+    if verdict == "deny":
+        return {"verdict": "deny", "reason": f"Denied by '{rule_name or rule_id}'"}
+    if verdict == "pending":
+        return {"verdict": "pending", "reason": f"Pending approval — '{rule_name or rule_id}'"}
+
+    return {"verdict": "deny", "reason": "Unknown verdict"}
 
 
 # ── Static files ──────────────────────────────────────────────────────────────

@@ -248,6 +248,28 @@
 
     .muted { color: var(--muted); }
     .mono  { font-family: var(--mono); }
+
+    /* ── Activity page ── */
+    .activity-token-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; flex-shrink: 0; }
+    .activity-token-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 10px; }
+    .activity-token-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .activity-token-value { font-family: var(--mono); font-size: 13px; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 6px 12px; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-token-hint { font-size: 12px; color: var(--muted); line-height: 1.8; }
+    .activity-token-hint code { font-family: var(--mono); font-size: 11px; background: var(--surface2); padding: 1px 5px; border-radius: 3px; color: var(--text-dim); }
+    .btn-danger-sm { background: none; border: 1px solid rgba(239,68,68,.4); color: var(--red); border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+    .btn-danger-sm:hover { background: rgba(239,68,68,.08); }
+    .activity-log-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .activity-log-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); flex-shrink: 0; }
+    .activity-empty { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+    .activity-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .activity-table th { text-align: left; padding: 8px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--border); background: var(--surface2); }
+    .activity-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); color: var(--text-dim); vertical-align: middle; }
+    .activity-table tr:last-child td { border-bottom: none; }
+    .activity-table tr:hover td { background: var(--surface2); }
+    .activity-ts { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .activity-tool { font-family: var(--mono); font-size: 12px; }
+    .activity-params { font-family: var(--mono); font-size: 11px; color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-rule { font-size: 12px; color: var(--text-dim); }
   </style>
 </head>
 <body>
@@ -270,6 +292,9 @@
     </div>
     <div class="nav-item" id="nav-policies" onclick="showPage('policies',this)">
       <span class="nav-icon">📋</span> Policy Rules
+    </div>
+    <div class="nav-item" id="nav-activity" onclick="showPage('activity',this)">
+      <span class="nav-icon">⚡</span> Activity
     </div>
   </nav>
   <div class="sidebar-bottom">
@@ -526,6 +551,47 @@
     </div>
   </div>
 
+  <!-- ── Activity page ── -->
+  <div class="page" id="page-activity">
+    <div class="page-header">
+      <div class="page-title-block">
+        <div class="page-title">Activity</div>
+        <div class="page-sub">Live evaluations from your OpenClaw agent via <code style="font-size:12px;">/check</code></div>
+      </div>
+      <button class="btn-secondary" onclick="loadActivity()">↺ Refresh</button>
+    </div>
+    <div class="page-body" style="display:flex;flex-direction:column;gap:20px;padding-top:16px;">
+
+      <!-- Token management -->
+      <div class="activity-token-card">
+        <div class="activity-token-label">Agent Token</div>
+        <div class="activity-token-row">
+          <code class="activity-token-value" id="token-display">—</code>
+          <button class="btn-secondary" onclick="copyToken()" id="btn-copy-token" style="display:none;">Copy</button>
+          <button class="btn-secondary" onclick="generateToken()">Generate</button>
+          <button class="btn-danger-sm" onclick="revokeToken()" id="btn-revoke-token" style="display:none;">Revoke</button>
+        </div>
+        <div class="activity-token-hint">
+          Configure your OpenClaw plugin with:<br/>
+          <code>OC_POLICY_SERVER_URL=https://policy.lewtucker.net</code><br/>
+          <code>OC_POLICY_AGENT_TOKEN=&lt;your token&gt;</code>
+        </div>
+      </div>
+
+      <!-- Activity log -->
+      <div class="activity-log-card">
+        <div class="activity-log-header">
+          <span>Recent evaluations</span>
+          <span id="activity-count" style="font-weight:400;color:var(--muted);font-size:12px;"></span>
+        </div>
+        <div id="activity-log-body">
+          <div class="activity-empty">No activity yet — evaluations from your OpenClaw agent will appear here.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </main>
 
 <!-- ═══ MODALS ═══ -->
@@ -645,6 +711,7 @@
     document.getElementById('page-' + name).classList.add('active');
     el.classList.add('active');
     if (name === 'rulemaker') loadSkillPreview();
+    if (name === 'activity') loadActivity();
   }
 
   function navTo(name) {
@@ -1161,6 +1228,98 @@
     }
 
     pane.innerHTML = html;
+  }
+
+  // ── Activity & Token ───────────────────────────────────────────────────────
+
+  let _currentToken = null;
+
+  async function loadActivity() {
+    const res = await api('GET', '/token');
+    if (res && res.ok) {
+      const data = await res.json();
+      _currentToken = data.token;
+      renderToken(_currentToken);
+    }
+    const res2 = await api('GET', '/activity?limit=100');
+    if (res2 && res2.ok) {
+      const data = await res2.json();
+      renderActivityLog(data.activity);
+    }
+  }
+
+  function renderToken(token) {
+    const display = document.getElementById('token-display');
+    const btnCopy = document.getElementById('btn-copy-token');
+    const btnRevoke = document.getElementById('btn-revoke-token');
+    if (token) {
+      display.textContent = token;
+      btnCopy.style.display = '';
+      btnRevoke.style.display = '';
+    } else {
+      display.textContent = '—';
+      btnCopy.style.display = 'none';
+      btnRevoke.style.display = 'none';
+    }
+  }
+
+  async function generateToken() {
+    const res = await api('POST', '/token/generate');
+    if (res && res.ok) {
+      const data = await res.json();
+      _currentToken = data.token;
+      renderToken(_currentToken);
+    }
+  }
+
+  async function revokeToken() {
+    if (!confirm('Revoke token? Your OpenClaw agent will stop being able to call /check.')) return;
+    const res = await api('DELETE', '/token');
+    if (res && res.ok) {
+      _currentToken = null;
+      renderToken(null);
+    }
+  }
+
+  function copyToken() {
+    if (_currentToken) {
+      navigator.clipboard.writeText(_currentToken);
+    }
+  }
+
+  function renderActivityLog(rows) {
+    const body = document.getElementById('activity-log-body');
+    const count = document.getElementById('activity-count');
+    if (!rows || rows.length === 0) {
+      body.innerHTML = '<div class="activity-empty">No activity yet — evaluations from your OpenClaw agent will appear here.</div>';
+      count.textContent = '';
+      return;
+    }
+    count.textContent = `${rows.length} event${rows.length === 1 ? '' : 's'}`;
+    const verdictPill = v => {
+      if (v === 'allow')   return `<span class="pill allow" style="font-size:10px;">allow</span>`;
+      if (v === 'deny')    return `<span class="pill deny" style="font-size:10px;">deny</span>`;
+      if (v === 'pending') return `<span class="pill pending" style="font-size:10px;">pending</span>`;
+      return `<span class="pill" style="font-size:10px;background:var(--surface2);color:var(--muted);">no-match</span>`;
+    };
+    const rows_html = rows.map(r => {
+      const ts = new Date(r.ts).toLocaleString();
+      let params = '';
+      try { params = Object.entries(JSON.parse(r.params_json)).map(([k,v]) => `${k}=${v}`).join(' · '); } catch(e) {}
+      return `<tr>
+        <td class="activity-ts">${esc(ts)}</td>
+        <td class="activity-tool">${esc(r.tool)}</td>
+        <td class="activity-params" title="${esc(params)}">${esc(params) || '—'}</td>
+        <td>${verdictPill(r.verdict)}</td>
+        <td class="activity-rule">${esc(r.rule_name || r.rule_id || '—')}</td>
+      </tr>`;
+    }).join('');
+    body.innerHTML = `<table class="activity-table">
+      <thead><tr>
+        <th>Time</th><th>Tool</th><th>Params</th><th>Verdict</th><th>Matched Rule</th>
+      </tr></thead>
+      <tbody>${rows_html}</tbody>
+    </table>`;
   }
 
   // ── Modal helpers ──────────────────────────────────────────────────────────

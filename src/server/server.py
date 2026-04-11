@@ -8,6 +8,9 @@ import tempfile
 import yaml
 from pathlib import Path
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent / ".env")
 
 from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
 from fastapi.staticfiles import StaticFiles
@@ -23,7 +26,9 @@ from nl_policy import create_chat_handler
 
 _server_dir = Path(__file__).parent
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
-FIXED_PASSWORD = "ZPR"
+APP_PASSWORD   = os.environ.get("APP_PASSWORD")
+if not APP_PASSWORD:
+    raise RuntimeError("APP_PASSWORD is not set. Add it to src/server/.env or the environment.")
 
 
 @asynccontextmanager
@@ -76,7 +81,7 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(request: Request, email: str = Form(...), password: str = Form(...)):
     email = email.strip().lower()
-    if not email or password != FIXED_PASSWORD:
+    if not email or password != APP_PASSWORD:
         return RedirectResponse("/login?error=1", status_code=303)
     database.get_or_create_user(email)
     request.session["email"] = email

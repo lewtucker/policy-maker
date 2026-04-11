@@ -77,6 +77,18 @@ match:
 
 All `match` fields are optional and AND-ed together. An empty `match: {}` matches everything — useful as a catch-all deny at the lowest priority.
 
+**Wildcard and multi-value behaviour:**
+
+| Field | Wildcards | Multiple values |
+| ----- | --------- | --------------- |
+| `path` | `*` and `**` via `fnmatch` — both match any characters including `/` so `/foo/*.txt` also matches `/foo/sub/file.txt` | Not supported |
+| `program` | `*` and `**` via `fnmatch` | Not supported |
+| `tool` | Not supported — exact match only | Not supported |
+| `person` | Not supported — exact match only | Not supported |
+| `group` | Not supported — exact match only | Not supported |
+
+To match multiple tools or programs, write a separate rule for each one.
+
 **Priority guidance:**
 
 | Specificity | Suggested range |

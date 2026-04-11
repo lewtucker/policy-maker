@@ -141,7 +141,7 @@ Every request to `/check` carries a Bearer token in the `Authorization` header. 
 
 This makes Policy Maker naturally multi-user. A single shared server can govern multiple independent agent deployments simultaneously — each agent is configured with a different token, and each token owner maintains their own rules, people roster, and activity log completely independently. No agent can see or affect another user's policy.
 
-```
+```text
 Agent A  → Bearer token-A  →  User A's rule set  →  User A's activity log
 Agent B  → Bearer token-B  →  User B's rule set  →  User B's activity log
 Agent C  → Bearer token-C  →  User C's rule set  →  User C's activity log

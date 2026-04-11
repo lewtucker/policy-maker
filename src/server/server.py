@@ -186,7 +186,10 @@ async def delete_all_policies(request: Request):
 async def analyze_policies(request: Request):
     email = _require_session(request)
     engine = _get_engine(email)
-    findings = analyze(engine.rules, known_people=[], known_groups=[])
+    people = database.get_people(email)
+    known_people = [p["name"] for p in people]
+    known_groups = list({g for p in people for g in p.get("groups", [])})
+    findings = analyze(engine.rules, known_people=known_people, known_groups=known_groups)
     return {
         "findings": [f.to_dict() for f in findings],
         "summary": summarize(findings),
@@ -365,8 +368,30 @@ def _engine_for_chat(email: str) -> PolicyEngine:
 chat_router = create_chat_handler(
     get_engine_fn=_engine_for_chat,
     get_skill_fn=_resolve_skill,
+    get_people_fn=database.get_people,
 )
 app.include_router(chat_router)
+
+
+# ── People & Groups endpoints ─────────────────────────────────────────────────
+
+@app.get("/people")
+async def get_people(request: Request):
+    email = _require_session(request)
+    return {"people": database.get_people(email)}
+
+
+class PersonBody(BaseModel):
+    name: str
+    groups: list[str] = []
+
+
+@app.post("/people")
+async def save_people(body: list[PersonBody], request: Request):
+    email = _require_session(request)
+    people = [p.model_dump() for p in body]
+    database.save_people(email, people)
+    return {"saved": len(people)}
 
 
 # ── Agent token endpoints ─────────────────────────────────────────────────────

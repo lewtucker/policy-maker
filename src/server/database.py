@@ -6,6 +6,7 @@ Tables:
 """
 import sqlite3
 import os
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,6 +30,7 @@ def init_db() -> None:
                 rules_yaml   TEXT NOT NULL DEFAULT '',
                 skill_text   TEXT,
                 agent_token  TEXT,
+                people_json  TEXT NOT NULL DEFAULT '[]',
                 created_at   TEXT NOT NULL
             )
         """)
@@ -44,11 +46,15 @@ def init_db() -> None:
                 rule_name   TEXT
             )
         """)
-        # Migration: add agent_token column if upgrading an existing DB
-        try:
-            conn.execute("ALTER TABLE users ADD COLUMN agent_token TEXT")
-        except sqlite3.OperationalError:
-            pass
+        # Migrations for existing DBs
+        for col, definition in [
+            ("agent_token", "TEXT"),
+            ("people_json", "TEXT NOT NULL DEFAULT '[]'"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+            except sqlite3.OperationalError:
+                pass
         conn.commit()
 
 
@@ -116,6 +122,26 @@ def get_agent_token(email: str) -> str | None:
 def save_agent_token(email: str, token: str) -> None:
     with _conn() as conn:
         conn.execute("UPDATE users SET agent_token = ? WHERE email = ?", (token, email))
+        conn.commit()
+
+
+def get_people(email: str) -> list:
+    """Return list of {name, groups} dicts."""
+    user = get_user(email)
+    if not user or not user["people_json"]:
+        return []
+    try:
+        return json.loads(user["people_json"])
+    except Exception:
+        return []
+
+
+def save_people(email: str, people: list) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE users SET people_json = ? WHERE email = ?",
+            (json.dumps(people), email),
+        )
         conn.commit()
 
 

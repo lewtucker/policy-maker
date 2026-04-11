@@ -434,6 +434,26 @@
         </div>
       </div>
 
+      <!-- People & Groups panel -->
+      <div class="section-header">
+        <span class="section-title">People &amp; Groups</span>
+        <button class="btn btn-ghost btn-sm" onclick="openPeopleModal()">+ Add person</button>
+      </div>
+      <div class="card" style="margin-bottom:20px;">
+        <table id="people-table">
+          <thead>
+            <tr>
+              <th style="width:30%">Name</th>
+              <th>Groups</th>
+              <th style="width:80px;"></th>
+            </tr>
+          </thead>
+          <tbody id="people-tbody">
+            <tr><td colspan="3" class="muted" style="padding:16px;text-align:center;">No people defined yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- Rules table -->
       <div class="section-header">
         <span class="section-title" id="rules-section-title">Rules</span>
@@ -596,6 +616,26 @@
 
 <!-- ═══ MODALS ═══ -->
 
+<!-- Add / Edit Person -->
+<div class="modal-overlay" id="people-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-title" id="people-modal-title">Add person</div>
+    <div class="form-row">
+      <label>Name</label>
+      <input type="text" id="p-name" placeholder="alice" />
+    </div>
+    <div class="form-row">
+      <label>Groups <span style="font-weight:400;color:var(--muted);">(comma-separated)</span></label>
+      <input type="text" id="p-groups" placeholder="engineering, finance" />
+    </div>
+    <div class="banner error" id="people-modal-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('people-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePerson()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add / Edit Rule -->
 <div class="modal-overlay" id="rule-modal">
   <div class="modal">
@@ -740,8 +780,74 @@
       document.getElementById('status-dot').style.background = 'var(--green)';
     }
     loadRules();
+    loadPeople();
     resetChat();
     document.querySelectorAll('.sim-inline').forEach(autosize);
+  }
+
+  // ── People & Groups ────────────────────────────────────────────────────────
+  let _people = [];
+  let _editingPersonIdx = -1;
+
+  async function loadPeople() {
+    const res = await api('GET', '/people');
+    if (!res || !res.ok) return;
+    const data = await res.json();
+    _people = data.people || [];
+    renderPeople();
+  }
+
+  function renderPeople() {
+    const tbody = document.getElementById('people-tbody');
+    if (!_people.length) {
+      tbody.innerHTML = `<tr><td colspan="3" class="muted" style="padding:16px;text-align:center;">No people defined yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = _people.map((p, i) => `
+      <tr>
+        <td style="font-weight:500;">${esc(p.name)}</td>
+        <td>${(p.groups||[]).map(g => `<span class="pill" style="font-size:11px;background:var(--surface2);color:var(--text-dim);margin-right:4px;">${esc(g)}</span>`).join('') || '<span class="muted">—</span>'}</td>
+        <td style="text-align:right;">
+          <button class="btn btn-ghost btn-sm" onclick="openPeopleModal(${i})">Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="deletePerson(${i})">✕</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function openPeopleModal(idx = -1) {
+    _editingPersonIdx = idx;
+    document.getElementById('people-modal-title').textContent = idx === -1 ? 'Add person' : 'Edit person';
+    document.getElementById('p-name').value = idx === -1 ? '' : _people[idx].name;
+    document.getElementById('p-groups').value = idx === -1 ? '' : (_people[idx].groups || []).join(', ');
+    document.getElementById('people-modal-error').textContent = '';
+    document.getElementById('people-modal-error').classList.remove('show');
+    openModal('people-modal');
+  }
+
+  async function savePerson() {
+    const name = document.getElementById('p-name').value.trim();
+    if (!name) { showModalError('people-modal-error', 'Name is required.'); return; }
+    const groups = document.getElementById('p-groups').value
+      .split(',').map(g => g.trim()).filter(Boolean);
+    const updated = [..._people];
+    if (_editingPersonIdx === -1) {
+      updated.push({ name, groups });
+    } else {
+      updated[_editingPersonIdx] = { name, groups };
+    }
+    const res = await api('POST', '/people', updated);
+    if (!res || !res.ok) { showModalError('people-modal-error', 'Save failed.'); return; }
+    _people = updated;
+    renderPeople();
+    closeModal('people-modal');
+  }
+
+  async function deletePerson(idx) {
+    const updated = _people.filter((_, i) => i !== idx);
+    const res = await api('POST', '/people', updated);
+    if (!res || !res.ok) return;
+    _people = updated;
+    renderPeople();
   }
 
   // ── Rules ──────────────────────────────────────────────────────────────────

@@ -55,7 +55,7 @@ def _extract_proposed(text: str) -> tuple[str | None, list[dict] | None, str | N
     return None, None, None
 
 
-def create_chat_handler(get_engine_fn, get_skill_fn):
+def create_chat_handler(get_engine_fn, get_skill_fn, get_people_fn=None):
     """
     Factory returning the /chat endpoint.
     get_engine_fn(email) -> PolicyEngine
@@ -79,14 +79,21 @@ def create_chat_handler(get_engine_fn, get_skill_fn):
 
         policies_json = json.dumps([r.to_dict() for r in engine.rules], indent=2)
 
+        # Load people roster if available
+        people = get_people_fn(email) if get_people_fn else []
+        known_people = [p["name"] for p in people]
+        known_groups = list({g for p in people for g in p.get("groups", [])})
+        people_json = json.dumps(people, indent=2)
+
         # Run the analyzer so Claude has real findings to reason about
         from policy_analyzer import analyze
-        findings = analyze(engine.rules, known_people=[], known_groups=[])
+        findings = analyze(engine.rules, known_people=known_people, known_groups=known_groups)
         analysis_json = json.dumps([f.to_dict() for f in findings], indent=2)
 
         # Substitute context into the skill prompt
         system_prompt = system_prompt.replace("{policies_json}", policies_json)
         system_prompt = system_prompt.replace("{analysis_json}", analysis_json)
+        system_prompt = system_prompt.replace("{people_json}", people_json)
 
         messages = [{"role": t["role"], "content": t["content"]} for t in req.history]
         messages.append({"role": "user", "content": req.message})

@@ -122,12 +122,28 @@ class RuleBody(BaseModel):
     match: dict = {}
 
 
+_CASE_INSENSITIVE_MATCH_FIELDS = {"tool", "program", "group", "person"}
+
+def _normalize_match(match: dict) -> dict:
+    """Lowercase string values in match fields so comparisons are case-insensitive."""
+    return {
+        k: (v.lower() if isinstance(v, str) and k in _CASE_INSENSITIVE_MATCH_FIELDS else v)
+        for k, v in match.items()
+    }
+
+
+def _normalized_rule_dict(body: RuleBody) -> dict:
+    d = body.model_dump()
+    d["match"] = _normalize_match(d.get("match") or {})
+    return d
+
+
 @app.post("/policies")
 async def add_policy(body: RuleBody, request: Request):
     email = _require_session(request)
     engine, tmp = user_engine.get_engine(email)
     try:
-        rule = engine.add(body.model_dump())
+        rule = engine.add(_normalized_rule_dict(body))
         user_engine.save_engine(email, tmp)
         return rule.to_dict()
     except ValueError as e:
@@ -141,7 +157,7 @@ async def update_policy(rule_id: str, body: RuleBody, request: Request):
     email = _require_session(request)
     engine, tmp = user_engine.get_engine(email)
     try:
-        rule = engine.update(rule_id, body.model_dump())
+        rule = engine.update(rule_id, _normalized_rule_dict(body))
         user_engine.save_engine(email, tmp)
         return rule.to_dict()
     except KeyError as e:
@@ -240,7 +256,7 @@ async def simulate(body: SimulateRequest, request: Request):
     # Build params dict matching what policy_engine._matches() expects
     params = {}
     if body.program:
-        params["command"] = f"{body.program} ..."
+        params["command"] = f"{body.program.lower()} ..."
     if body.path:
         params["path"] = body.path
 
@@ -257,7 +273,7 @@ async def simulate(body: SimulateRequest, request: Request):
     trace = []
     first_match_found = False
     for rule in engine.rules:
-        matched = engine._matches(rule, body.tool, params, subject)
+        matched = engine._matches(rule, body.tool.lower(), params, subject)
         fired = matched and not first_match_found
         if fired:
             first_match_found = True
@@ -449,7 +465,7 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
 
     # Build params matching policy_engine expectations
     params = {}
-    command = body.params.get("command", "")
+    command = body.params.get("command", "").lower()
     if command:
         params["command"] = command
     path = body.params.get("path", "")
@@ -470,7 +486,7 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
     rule_id = None
     rule_name = None
     for rule in engine.rules:
-        if engine._matches(rule, body.tool, params, subject):
+        if engine._matches(rule, body.tool.lower(), params, subject):
             verdict = rule.result
             rule_id = rule.id
             rule_name = rule.name

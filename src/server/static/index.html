@@ -434,31 +434,11 @@
         </div>
       </div>
 
-      <!-- People & Groups panel -->
-      <div class="section-header">
-        <span class="section-title">People &amp; Groups</span>
-        <button class="btn btn-ghost btn-sm" onclick="openPeopleModal()">+ Add person</button>
-      </div>
-      <div class="card" style="margin-bottom:20px;">
-        <table id="people-table">
-          <thead>
-            <tr>
-              <th style="width:30%">Name</th>
-              <th>Groups</th>
-              <th style="width:80px;"></th>
-            </tr>
-          </thead>
-          <tbody id="people-tbody">
-            <tr><td colspan="3" class="muted" style="padding:16px;text-align:center;">No people defined yet.</td></tr>
-          </tbody>
-        </table>
-      </div>
-
       <!-- Rules table -->
       <div class="section-header">
         <span class="section-title" id="rules-section-title">Rules</span>
       </div>
-      <div class="card">
+      <div class="card" style="margin-bottom:20px;">
         <table id="rules-table">
           <thead>
             <tr>
@@ -474,6 +454,27 @@
           </tbody>
         </table>
       </div>
+
+      <!-- People & Groups panel -->
+      <div class="section-header" style="margin-top:8px;">
+        <span class="section-title">People &amp; Groups</span>
+        <button class="btn btn-ghost btn-sm" onclick="openPeopleModal()">+ Add person</button>
+      </div>
+      <div class="card">
+        <table id="people-table">
+          <thead>
+            <tr>
+              <th style="width:30%">Name</th>
+              <th>Groups</th>
+              <th style="width:80px;"></th>
+            </tr>
+          </thead>
+          <tbody id="people-tbody">
+            <tr><td colspan="3" class="muted" style="padding:16px;text-align:center;">No people defined yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
     </div>
   </div>
 
@@ -808,8 +809,8 @@
         <td style="font-weight:500;">${esc(p.name)}</td>
         <td>${(p.groups||[]).map(g => `<span class="pill" style="font-size:11px;background:var(--surface2);color:var(--text-dim);margin-right:4px;">${esc(g)}</span>`).join('') || '<span class="muted">—</span>'}</td>
         <td style="text-align:right;">
-          <button class="btn btn-ghost btn-sm" onclick="openPeopleModal(${i})">Edit</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="deletePerson(${i})">✕</button>
+          <button class="btn-icon" title="Edit" onclick="openPeopleModal(${i})">✎</button>
+          <button class="btn-icon" style="color:var(--red);" title="Delete" onclick="deletePerson(${i})">✕</button>
         </td>
       </tr>`).join('');
   }

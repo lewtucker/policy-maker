@@ -1,6 +1,6 @@
 # Policy Maker
 
-Policy Maker is a sandbox tool for designing, testing, and managing governance policies for AI agents. It gives you a web UI to build rules in plain English, simulate how those rules would evaluate against hypothetical agent actions, and connect a live AI agent so its requests are gated by your policy.
+Policy Maker is a sandbox tool for designing, testing, and managing governance policies for AI agents. It gives you a web UI to build rules in plain English, simulate how those rules would evaluate against hypothetical agent actions, and connect a live AI agent so its requests are gated by your policy. This work was inspired by the [ZPR policy language](http://zpr.org) to make policy and security rules easier to understand.
 
 It is designed to work alongside [OpenClaw](https://github.com/lewtucker/OC_Policy) / nanoclaw — Claude-based AI coding agents — but the rule authoring and simulation features work entirely on their own.
 

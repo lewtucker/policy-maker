@@ -4,77 +4,100 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Policy-maker** is a standalone policy exploration and analysis tool — a variant of the OC_Policy system at `../OC_Policy` stripped of OpenClaw integration. Users log in with an email address, explore and build policy rules, and analyze them using a Claude-powered assistant. Policies are stored per-user in a database.
+**Policy Maker** is a standalone sandbox for designing and testing AI agent governance policies. Users log in with an email address, build policy rules via a Claude-powered assistant, simulate how rules evaluate against hypothetical actions, and analyze their rule set for health issues. Policies are stored per-user in SQLite. There is no live agent connection — this is an exploration tool only.
 
-The reference implementation to draw from is `../OC_Policy/src/server/`. Policy-maker reuses the policy engine, policy analyzer, and NL policy authoring logic but removes the enforcement plugin, approval queue, and Telegram integration.
+GitHub: https://github.com/lewtucker/policy-maker (private)
 
-## Planned Architecture
+## Running Locally
 
-### Authentication
-- Email + fixed password `"ZPR"` (no real auth — just user partitioning)
-- New email → new user record with an empty rule set
-- Existing email → retrieve saved rule set from database
+```bash
+cd src/server
+./start.sh          # installs deps, starts on http://localhost:8080
+# password: ZPR (any email accepted)
+```
 
-### Backend (Python/FastAPI — adapt from OC_Policy)
-Key modules to carry over from `../OC_Policy/src/server/`:
-- `policy_engine.py` — Rule parser and priority-based evaluator (keep as-is)
-- `policy_analyzer.py` — Tier 1+2 policy health checks (keep as-is)
-- `nl_policy.py` — Claude-powered natural language rule authoring (adapt)
+Or directly:
+```bash
+cd src/server
+uvicorn server:app --reload --port 8080
+```
 
-Modules to drop or replace:
-- `approvals.py` — Not needed (no OpenClaw enforcement)
-- `audit.py` — Not needed (no live enforcement)
-- `identity.py` — Replace with simple email-based user store
-- Token auth (agent/admin split) → replace with session auth tied to email login
+## File Structure
 
-### Database
-Policies per user stored in a database keyed by email. Each user record holds:
-- Their rule set (same YAML structure as `policies.yaml` in OC_Policy)
-- The agent skill prompt (uploaded or default)
+```
+src/server/
+  server.py           FastAPI app — auth, policy CRUD, simulate, skill endpoints
+  database.py         SQLite wrapper (users table: email, rules_yaml, skill_text)
+  user_engine.py      Bridge between per-user YAML in DB and PolicyEngine (temp file pattern)
+  policy_engine.py    Rule parser + evaluator — copied verbatim from OC_Policy, do not modify
+  policy_analyzer.py  Tier 1+2 health checks — copied verbatim from OC_Policy, do not modify
+  nl_policy.py        Claude-powered chat endpoint; injects live rules + analyzer findings
+  default_skill.txt   Default system prompt for the NL assistant
+  requirements.txt
+  start.sh
+  static/
+    index.html        Single-page app (all JS inline)
+    login.html        Email + password login form
+```
 
-### UI (adapt from OC_Policy's `src/server/static/index.html`)
-Two tabs:
-1. **Policies tab** — View, add, edit, delete rules. Same UI elements as the OC_Policy Manager Policies page.
-2. **Rule-maker tab** — NL policy assistant chat panel + upload/download the agent skill prompt file.
+## Architecture
 
-Drop from OC_Policy UI: Dashboard, Approvals tab, Identities tab, Activity feed.
+**Auth**: `SessionMiddleware` with a session cookie (`pm_session`). Any email accepted; password is always `"ZPR"`. New email → creates a user row in SQLite.
 
-## Key Design Decisions from the Spec
+**Per-user storage**: `database.py` wraps a single SQLite file (`policy_maker.db`, in `/tmp/` on Vercel). Each user row stores `rules_yaml` (YAML string) and `skill_text` (NL assistant system prompt, NULL = use default).
 
-- Any email is accepted; password is always `"ZPR"`
-- Agent skill prompt is stored per-user in the database; users can upload a modified version
-- No OpenClaw connection, no enforcement — this is an explorer/sandbox tool only
-- Policy rule structure remains identical to OC_Policy (YAML schema, priority, conditions, effects)
+**Policy engine bridge**: `PolicyEngine` expects a file path. `user_engine.py` writes the user's YAML to a `tempfile`, passes the path to `PolicyEngine`, then reads the (mutated) file back after any CRUD operation and saves it to SQLite.
 
-## Reference Files in OC_Policy
+**NL chat** (`POST /chat`): Loads the user's engine + skill prompt, runs the analyzer to populate `{analysis_json}`, substitutes both into the system prompt, and calls Claude. Extracts `PROPOSED_RULE` JSON blocks from the response for the UI to render as accept/discard cards.
 
-When building policy-maker, these are the most relevant files to read:
+**Simulate** (`POST /simulate`): Runs `engine._matches()` against every rule in priority order and returns the full trace — each rule's per-condition breakdown (matched/missed/wildcard) plus which rule fired.
 
-| File | Purpose |
-|------|---------|
-| `../OC_Policy/src/server/policy_engine.py` | Core rule evaluation logic |
-| `../OC_Policy/src/server/policy_analyzer.py` | Tier 1+2 analysis checks |
-| `../OC_Policy/src/server/nl_policy.py` | Claude-powered NL authoring |
-| `../OC_Policy/src/server/server.py` | FastAPI app structure to adapt |
-| `../OC_Policy/src/server/static/index.html` | UI to adapt (Policies tab) |
-| `../OC_Policy/src/server/requirements.txt` | Python dependencies baseline |
-| `../OC_Policy/src/server/test_policy_suite.py` | Test patterns to follow |
+## UI Navigation (left sidebar)
+
+1. **Home** — welcome + how-to-use instructions, clickable cards that navigate to each tab
+2. **Create Rules** — Claude chat assistant (`AI Agent Rule Maker and Analysis` header) + skill prompt sidebar; `⬡ Policy Analyst` button sends a canned health-evaluation prompt; after a rule is accepted the chat resets to the welcome message
+3. **Simulate** — Mad Libs sentence form (`[person] in group [group] calls [tool] [program] on path [path]`) with inline auto-sizing inputs; quick presets; result shows verdict block + full evaluation trace
+4. **Policies** — rule table with edit/delete, health analyzer panel, import YAML, export YAML, delete all
+
+## Key API Endpoints
+
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/login` | Form: email + password |
+| POST | `/logout` | Clears session |
+| GET | `/me` | Returns email + rule_count |
+| GET/POST | `/policies` | List / add rule |
+| PUT/DELETE | `/policies/{id}` | Edit / delete (403 if protected) |
+| POST | `/policies/delete-all` | Skips protected rules |
+| GET | `/policies/analyze` | Tier 1+2 health findings |
+| POST | `/policies/import` | Merge YAML into user's rule set |
+| GET | `/policies/export` | Download as policies.yaml |
+| POST | `/simulate` | Returns verdict + full trace |
+| GET/POST | `/skill` | Get or upload skill prompt |
+| GET | `/skill/download` | Download as skill.txt |
+| POST | `/skill/reset` | Revert to default_skill.txt |
+| POST | `/chat` | NL assistant (Claude) |
 
 ## Policy Rule Schema
 
-Rules are attribute-based and evaluated highest-priority-first (first match wins):
+Rules are evaluated highest-priority-first; first match wins. Empty `match` = catch-all.
 
 ```yaml
-- id: unique-rule-id
-  name: Human-readable name
-  description: What this rule does
-  result: allow | deny | pending
-  priority: 100          # Higher = evaluated first
-  protected: false       # If true, cannot be edited/deleted via API
-  match:
-    tool: bash           # Optional: tool name to match
-    program: git         # Optional: program name
-    path: "/project/**"  # Optional: glob path match
-    person: alice        # Optional: person identity
-    group: engineering   # Optional: group membership
+id: unique-kebab-id
+name: Human-readable name
+description: What this rule does
+result: allow | deny | pending
+priority: 100
+protected: false        # true = cannot be edited/deleted via API
+match:                  # all fields optional, ANDed together
+  tool: bash
+  program: git
+  path: "/project/**"  # supports * and ** globs
+  person: alice
+  group: engineering
 ```
+
+## Things NOT to change
+
+- `policy_engine.py` and `policy_analyzer.py` are copied verbatim from `../OC_Policy` — do not modify them. If the engine needs adaptation, do it in `user_engine.py`.
+- The YAML structure of rules is intentionally identical to OC_Policy so rule sets are portable between the two systems.

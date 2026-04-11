@@ -466,8 +466,9 @@
         <table id="people-table">
           <thead>
             <tr>
-              <th style="width:30%">Name</th>
-              <th>Groups</th>
+              <th style="width:25%">Name</th>
+              <th style="width:30%">Groups</th>
+              <th style="width:20%">Telegram ID</th>
               <th style="width:80px;"></th>
             </tr>
           </thead>
@@ -626,11 +627,16 @@
     <div class="modal-title" id="people-modal-title">Add person</div>
     <div class="form-row">
       <label>Name</label>
-      <input type="text" id="p-name" placeholder="alice" />
+      <input type="text" id="p-name" placeholder="Lew Tucker" />
     </div>
     <div class="form-row">
       <label>Groups <span style="font-weight:400;color:var(--muted);">(comma-separated)</span></label>
       <input type="text" id="p-groups" placeholder="engineering, finance" />
+    </div>
+    <div class="form-row">
+      <label>Telegram ID <span style="font-weight:400;color:var(--muted);">(tg:123456789)</span></label>
+      <input type="text" id="p-telegram-id" placeholder="tg:6741893378" />
+      <div class="form-hint">Used to identify this person when nanoclaw calls /check</div>
     </div>
     <div class="banner error" id="people-modal-error"></div>
     <div class="modal-footer">
@@ -811,6 +817,7 @@
       <tr>
         <td style="font-weight:500;">${esc(p.name)}</td>
         <td>${(p.groups||[]).map(g => `<span class="pill" style="font-size:11px;background:var(--surface2);color:var(--text-dim);margin-right:4px;">${esc(g)}</span>`).join('') || '<span class="muted">—</span>'}</td>
+        <td class="muted mono" style="font-size:11px;">${esc(p.telegram_id || '—')}</td>
         <td style="text-align:right;">
           <button class="btn-icon" title="Edit" onclick="openPeopleModal(${i})">✎</button>
           <button class="btn-icon" style="color:var(--red);" title="Delete" onclick="deletePerson(${i})">✕</button>
@@ -823,6 +830,7 @@
     document.getElementById('people-modal-title').textContent = idx === -1 ? 'Add person' : 'Edit person';
     document.getElementById('p-name').value = idx === -1 ? '' : _people[idx].name;
     document.getElementById('p-groups').value = idx === -1 ? '' : (_people[idx].groups || []).join(', ');
+    document.getElementById('p-telegram-id').value = idx === -1 ? '' : (_people[idx].telegram_id || '');
     document.getElementById('people-modal-error').textContent = '';
     document.getElementById('people-modal-error').classList.remove('show');
     openModal('people-modal');
@@ -833,11 +841,12 @@
     if (!name) { showModalError('people-modal-error', 'Name is required.'); return; }
     const groups = document.getElementById('p-groups').value
       .split(',').map(g => g.trim()).filter(Boolean);
+    const telegram_id = document.getElementById('p-telegram-id').value.trim();
     const updated = [..._people];
     if (_editingPersonIdx === -1) {
-      updated.push({ name, groups });
+      updated.push({ name, groups, telegram_id });
     } else {
-      updated[_editingPersonIdx] = { name, groups };
+      updated[_editingPersonIdx] = { name, groups, telegram_id };
     }
     const res = await api('POST', '/people', updated);
     if (!res || !res.ok) { showModalError('people-modal-error', 'Save failed.'); return; }

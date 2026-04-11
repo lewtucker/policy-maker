@@ -463,6 +463,7 @@ class CheckRequest(BaseModel):
     params: dict = {}
     person: str = ""
     group: str = ""
+    channel_id: str = ""   # e.g. "tg:6741893378" — resolved to a person via telegram_id
 
 
 @app.post("/check")
@@ -485,14 +486,24 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
     if path:
         params["path"] = path
 
-    # Build subject if person/group provided
+    # Resolve channel_id (e.g. "tg:6741893378") to a person from the roster
+    person_name = body.person
+    person_groups = [body.group] if body.group else []
+    if body.channel_id:
+        people = database.get_people(email)
+        match = next((p for p in people if p.get("telegram_id") == body.channel_id), None)
+        if match:
+            person_name = match.get("name", person_name)
+            person_groups = match.get("groups", person_groups)
+
+    # Build subject if person/group resolved
     subject = None
-    if body.person or body.group:
+    if person_name or person_groups:
         class _Subject:
             def __init__(self, person_id, groups):
                 self.id = person_id
                 self.groups = groups
-        subject = _Subject(body.person, [body.group] if body.group else [])
+        subject = _Subject(person_name, person_groups)
 
     # Find first matching rule
     verdict = "no-match"
@@ -505,11 +516,14 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
             rule_name = rule.name
             break
 
-    # Log the call
+    # Log the call (include resolved identity in params for display)
+    log_params = dict(body.params)
+    if body.channel_id:
+        log_params["_caller"] = person_name or body.channel_id
     database.log_check(
         email=email,
         tool=body.tool,
-        params_json=json.dumps(body.params),
+        params_json=json.dumps(log_params),
         verdict=verdict,
         rule_id=rule_id,
         rule_name=rule_name,

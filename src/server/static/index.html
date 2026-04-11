@@ -862,18 +862,22 @@
     document.getElementById('status-label').textContent = `Ready · ${data.policies.length} rule${data.policies.length !== 1 ? 's' : ''}`;
   }
 
+  let _rulesCache = {};
+
   function renderRules(rules) {
     const tbody = document.getElementById('rules-tbody');
     if (!rules.length) {
       tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div>No rules yet — try the Create Rules tab.</div></td></tr>`;
       return;
     }
+    _rulesCache = {};
+    rules.forEach(r => { _rulesCache[r.id] = r; });
     tbody.innerHTML = rules.map(r => {
       const matchChips = Object.entries(r.match || {})
         .map(([k, v]) => `<span class="td-match-chip">${k}: ${v}</span>`).join('');
       const matchCell = matchChips || `<span class="muted" style="font-size:12px;">— (catch-all)</span>`;
       const lockIcon  = r.protected ? `<span title="Protected rule" style="color:var(--muted);font-size:13px;">🔒</span>` : '';
-      const editBtn   = `<button class="btn-icon" title="Edit" onclick="openEditModal(${JSON.stringify(r)})">✎</button>`;
+      const editBtn   = `<button class="btn-icon" title="Edit" onclick="openEditModal('${r.id}')">✎</button>`;
       const delBtn    = r.protected ? '' : `<button class="btn-icon" style="color:var(--red)" title="Delete" onclick="deleteRule('${r.id}')">✕</button>`;
       return `<tr>
         <td><div class="td-name">${esc(r.name || r.id)}</div><div class="td-desc">${esc(r.description || '')}</div></td>
@@ -902,7 +906,9 @@
     setTimeout(() => document.getElementById('f-id').focus(), 50);
   }
 
-  function openEditModal(rule) {
+  function openEditModal(ruleId) {
+    const rule = _rulesCache[ruleId];
+    if (!rule) return;
     _editingRuleId = rule.id;
     document.getElementById('rule-modal-title').textContent = 'Edit rule';
     document.getElementById('rule-modal-save').textContent  = 'Save changes';

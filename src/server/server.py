@@ -407,6 +407,8 @@ async def get_activity(request: Request, limit: int = 50):
 class CheckRequest(BaseModel):
     tool: str
     params: dict = {}
+    person: str = ""
+    group: str = ""
 
 
 @app.post("/check")
@@ -429,12 +431,21 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
     if path:
         params["path"] = path
 
+    # Build subject if person/group provided
+    subject = None
+    if body.person or body.group:
+        class _Subject:
+            def __init__(self, person_id, groups):
+                self.id = person_id
+                self.groups = groups
+        subject = _Subject(body.person, [body.group] if body.group else [])
+
     # Find first matching rule
     verdict = "no-match"
     rule_id = None
     rule_name = None
     for rule in engine.rules:
-        if engine._matches(rule, body.tool, params, None):
+        if engine._matches(rule, body.tool, params, subject):
             verdict = rule.result
             rule_id = rule.id
             rule_name = rule.name

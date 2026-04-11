@@ -400,6 +400,7 @@ async def get_people(request: Request):
 class PersonBody(BaseModel):
     name: str
     groups: list[str] = []
+    telegram_id: str = ""
 
 
 @app.post("/people")

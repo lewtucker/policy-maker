@@ -221,7 +221,7 @@ async def export_policies(request: Request):
 # ── Simulate endpoint ─────────────────────────────────────────────────────────
 
 class SimulateRequest(BaseModel):
-    tool: str
+    tool: str = ""
     program: str = ""
     path: str = ""
     person: str = ""

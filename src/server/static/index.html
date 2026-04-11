@@ -178,9 +178,25 @@
     .sim-preset:hover { border-color: var(--blue); color: var(--blue); background: rgba(37,99,235,.06); }
     .sim-run-btn { background: var(--blue); color: #fff; border: none; border-radius: 6px; padding: 9px 22px; font-size: 14px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
     .sim-run-btn:hover { opacity: .87; }
+    .sim-reset-btn { background: none; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 9px 16px; font-size: 13px; font-weight: 500; cursor: pointer; flex-shrink: 0; }
+    .sim-reset-btn:hover { border-color: var(--red); color: var(--red); }
     .sim-result-pane { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
     .sim-empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 13px; }
     .sim-empty-icon { font-size: 32px; margin-bottom: 10px; }
+    .sim-history-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 4px 2px 0; }
+    details.sim-history-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+    details.sim-history-item summary { display: flex; align-items: center; gap: 10px; padding: 11px 16px; cursor: pointer; list-style: none; font-size: 13px; color: var(--text-dim); user-select: none; }
+    details.sim-history-item summary::-webkit-details-marker { display: none; }
+    details.sim-history-item summary:hover { background: var(--surface2); }
+    .sim-history-chevron { font-size: 10px; color: var(--muted); margin-left: auto; transition: transform .15s; }
+    details.sim-history-item[open] .sim-history-chevron { transform: rotate(90deg); }
+    .sim-history-sentence { flex: 1; font-family: var(--mono); font-size: 12px; }
+    .sim-history-verdict { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: .04em; flex-shrink: 0; }
+    .sim-history-verdict.allow   { background: rgba(34,197,94,.12);  color: #16a34a; }
+    .sim-history-verdict.deny    { background: rgba(239,68,68,.12);  color: #dc2626; }
+    .sim-history-verdict.pending { background: rgba(245,158,11,.12); color: #d97706; }
+    .sim-history-verdict.no-match { background: var(--surface2); color: var(--muted); }
+    details.sim-history-item .sim-history-body { border-top: 1px solid var(--border); padding: 0; }
     .verdict-block { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 22px; display: flex; align-items: center; gap: 20px; flex-shrink: 0; }
     .verdict-icon { font-size: 32px; flex-shrink: 0; }
     .verdict-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
@@ -250,10 +266,10 @@
       <span class="nav-icon">✦</span> Create Rules
     </div>
     <div class="nav-item" id="nav-simulate" onclick="showPage('simulate',this)">
-      <span class="nav-icon">▷</span> Simulate
+      <span class="nav-icon">▷</span> Test Action
     </div>
     <div class="nav-item" id="nav-policies" onclick="showPage('policies',this)">
-      <span class="nav-icon">📋</span> Policies
+      <span class="nav-icon">📋</span> Policy Rules
     </div>
   </nav>
   <div class="sidebar-bottom">
@@ -308,7 +324,7 @@
             <div class="home-card-icon">▷</div>
             <div class="home-card-body">
               <div class="home-card-title">
-                Simulate
+                Test Action
                 <span class="step">Step 2</span>
               </div>
               <div class="home-card-desc">Test any hypothetical action against your current rule set. Fill in the tool, program, and path an agent would use, then hit Evaluate. You'll see the verdict — allow, deny, or pending — and a full trace showing every rule that was checked and why it matched or didn't.</div>
@@ -320,7 +336,7 @@
             <div class="home-card-icon">📋</div>
             <div class="home-card-body">
               <div class="home-card-title">
-                Policies
+                Policy Rules
                 <span class="step">Step 3</span>
               </div>
               <div class="home-card-desc">View and manage your full rule set. Add, edit, or delete rules directly. Run the policy analyzer to catch problems: shadowed rules that can never fire, conflicting rules at the same priority, or overly broad allows that permit more than intended. Import a YAML file to load a starter set, or export your rules to use elsewhere.</div>
@@ -368,7 +384,7 @@
   <div class="page" id="page-policies">
     <div class="page-header">
       <div class="page-title-block">
-        <div class="page-title">Policies</div>
+        <div class="page-title">Policy Rules</div>
         <div class="page-sub">Define rules that control what actions agents are allowed to take</div>
       </div>
       <div class="page-actions">
@@ -430,7 +446,7 @@
           <div class="chat-header">
             <div class="chat-header-left">
               <div class="chat-header-title">AI Agent Rule Maker and Analysis</div>
-              <div class="chat-header-sub">Rules accepted here appear in your Policies tab · Powered by Claude</div>
+              <div class="chat-header-sub">Rules accepted here appear in your Policy Rules tab · Powered by Claude</div>
             </div>
             <button class="btn-analyst" id="analyst-btn" onclick="runPolicyAnalyst()">⬡ Policy Analyst</button>
           </div>
@@ -460,7 +476,7 @@
             <div style="font-size:12px;color:var(--muted);line-height:1.6;">
               <p style="margin-bottom:8px;">Rules are evaluated <strong style="color:var(--text);">highest priority first</strong> — the first match wins.</p>
               <p style="margin-bottom:8px;">Use <strong style="color:var(--text);">deny</strong> for hard blocks, <strong style="color:var(--text);">pending</strong> for human-in-the-loop approval.</p>
-              <p>After accepting rules, run <strong style="color:var(--text);">Analyze</strong> on the Policies tab to check for conflicts.</p>
+              <p>After accepting rules, run <strong style="color:var(--text);">Analyze</strong> on the Policy Rules tab to check for conflicts.</p>
             </div>
           </div>
         </div>
@@ -472,7 +488,7 @@
   <div class="page" id="page-simulate">
     <div class="page-header">
       <div class="page-title-block">
-        <div class="page-title">Simulate</div>
+        <div class="page-title">Test Action</div>
         <div class="page-sub">Test an action request against your rules and see which rule fires</div>
       </div>
     </div>
@@ -497,6 +513,7 @@
             <span class="sim-preset" onclick="loadPreset('','','web_fetch','','')">web fetch</span>
             <span class="sim-preset" onclick="loadPreset('','','read','','/etc/passwd')">read file</span>
           </div>
+          <button class="sim-reset-btn" onclick="resetSimulation()">✕ Reset</button>
           <button class="sim-run-btn" onclick="runSimulation()">▷ Evaluate</button>
         </div>
       </div>
@@ -1001,6 +1018,16 @@
     document.body.removeChild(tmp);
   }
 
+  function resetSimulation() {
+    ['sim-person','sim-group','sim-tool','sim-program','sim-path'].forEach(id => {
+      const el = document.getElementById(id);
+      el.value = '';
+      autosize(el);
+    });
+    simHistory = [];
+    renderAllSimResults();
+  }
+
   function loadPreset(person, group, tool, program, path) {
     const fields = { 'sim-person': person, 'sim-group': group, 'sim-tool': tool, 'sim-program': program, 'sim-path': path };
     Object.entries(fields).forEach(([id, val]) => {
@@ -1011,17 +1038,20 @@
     runSimulation();
   }
 
+  let simHistory = []; // [{inputs, data}, ...] newest first, max 5
+
+  function simSentence(inputs) {
+    const person  = inputs.person  || 'anyone';
+    const group   = inputs.group   || 'any group';
+    const tool    = inputs.tool    || '—';
+    const program = inputs.program ? ' ' + inputs.program : '';
+    const path    = inputs.path    || 'any path';
+    return `${person} · ${group} · ${tool}${program} · ${path}`;
+  }
+
   async function runSimulation() {
-    const tool = document.getElementById('sim-tool').value.trim();
-    if (!tool) {
-      const el = document.getElementById('sim-tool');
-      el.classList.add('shake');
-      el.focus();
-      setTimeout(() => el.classList.remove('shake'), 400);
-      return;
-    }
-    const body = {
-      tool,
+    const inputs = {
+      tool:    document.getElementById('sim-tool').value.trim(),
       program: document.getElementById('sim-program').value.trim(),
       path:    document.getElementById('sim-path').value.trim(),
       person:  document.getElementById('sim-person').value.trim(),
@@ -1030,14 +1060,17 @@
     const pane = document.getElementById('sim-result-pane');
     pane.innerHTML = '<div class="sim-empty"><div class="sim-empty-icon">⏳</div>Evaluating…</div>';
 
-    const res = await api('POST', '/simulate', body);
+    const res = await api('POST', '/simulate', inputs);
     if (!res || !res.ok) { pane.innerHTML = '<div class="sim-empty" style="color:var(--red);">Evaluation failed.</div>'; return; }
     const data = await res.json();
-    renderSimResult(data);
+
+    simHistory.unshift({ inputs, data });
+    if (simHistory.length > 5) simHistory.pop();
+
+    renderAllSimResults();
   }
 
-  function renderSimResult(data) {
-    const pane = document.getElementById('sim-result-pane');
+  function buildResultHTML(data) {
     const icons = { allow: '✓', deny: '✕', pending: '⏳', 'no-match': '—' };
     const bgCls = { allow: 'allow-bg', deny: 'deny-bg', pending: 'pending-bg', 'no-match': '' };
 
@@ -1089,7 +1122,7 @@
         </div>`;
     }).join('');
 
-    pane.innerHTML = `
+    return `
       ${verdictHTML}
       <div class="trace-card">
         <div class="trace-header">
@@ -1098,6 +1131,36 @@
         </div>
         ${traceRows}
       </div>`;
+  }
+
+  function renderAllSimResults() {
+    const pane = document.getElementById('sim-result-pane');
+    if (!simHistory.length) {
+      pane.innerHTML = '<div class="sim-empty"><div class="sim-empty-icon">▷</div>Fill in the blanks above and click <strong>Evaluate</strong><br/>to see how your rules respond.</div>';
+      return;
+    }
+
+    let html = buildResultHTML(simHistory[0].data);
+
+    if (simHistory.length > 1) {
+      html += '<div class="sim-history-label">Previous tests</div>';
+      for (let i = 1; i < simHistory.length; i++) {
+        const { inputs, data } = simHistory[i];
+        const verdict = data.matched_rule ? data.matched_rule.result : 'no-match';
+        const label   = verdict === 'no-match' ? 'NO MATCH' : verdict.toUpperCase();
+        html += `
+          <details class="sim-history-item">
+            <summary>
+              <span class="sim-history-verdict ${verdict}">${label}</span>
+              <span class="sim-history-sentence">${esc(simSentence(inputs))}</span>
+              <span class="sim-history-chevron">▶</span>
+            </summary>
+            <div class="sim-history-body">${buildResultHTML(data)}</div>
+          </details>`;
+      }
+    }
+
+    pane.innerHTML = html;
   }
 
   // ── Modal helpers ──────────────────────────────────────────────────────────

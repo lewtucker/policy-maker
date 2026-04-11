@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+
+# Database (per-user data)
+src/server/policy_maker.db
+
+# Environment
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/

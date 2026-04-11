@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Policy Maker — Mockup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #d4d4d8;
+      --surface:   #ffffff;
+      --surface2:  #e4e4e7;
+      --border:    #d4d4d8;
+      --muted:     #71717a;
+      --text:      #18181b;
+      --text-dim:  #52525b;
+      --green:     #16a34a;
+      --red:       #dc2626;
+      --red-dim:   #991b1b;
+      --amber:     #d97706;
+      --amber-dim: #92400e;
+      --blue:      #2563eb;
+      --blue-dim:  #1d4ed8;
+      --mono:      'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      --sans:      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; display: flex; height: 100vh; overflow: hidden; }
+
+    /* ── Login ── */
+    #login-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 500; }
+    #login-screen.hidden { display: none; }
+    .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 36px 32px; width: 360px; }
+    .login-brand { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .login-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+    .login-field { margin-bottom: 14px; }
+    .login-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 5px; }
+    .login-field input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 6px; font-size: 13px; font-family: var(--sans); }
+    .login-field input:focus { outline: none; border-color: var(--blue); }
+    .login-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .login-btn { width: 100%; background: var(--blue); color: #fff; border: none; border-radius: 6px; padding: 10px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 6px; }
+    .login-btn:hover { opacity: .88; }
+
+    /* ── Sidebar ── */
+    aside { width: 220px; min-width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+    .brand { padding: 20px 18px 16px; border-bottom: 1px solid var(--border); }
+    .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+    .brand-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    nav { padding: 10px 8px; flex: 1; }
+    .nav-item { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 6px; cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 500; user-select: none; }
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
+    .nav-item.active { background: var(--surface2); color: var(--text); }
+    .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+    .sidebar-bottom { padding: 12px 8px; border-top: 1px solid var(--border); }
+    .user-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 12px; color: var(--text-dim); }
+    .user-email { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .logout-btn { font-size: 11px; color: var(--muted); cursor: pointer; border: none; background: none; padding: 2px 4px; border-radius: 3px; }
+    .logout-btn:hover { background: var(--surface2); color: var(--text); }
+    .status-row { display: flex; align-items: center; gap: 7px; padding: 4px 10px 6px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .status-label { font-size: 11px; color: var(--muted); }
+
+    /* ── Main ── */
+    main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .page { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+    .page.active { display: flex; }
+    .page-header { padding: 24px 28px 0; flex-shrink: 0; display: flex; align-items: flex-start; justify-content: space-between; }
+    .page-title-block .page-title { font-size: 20px; font-weight: 600; }
+    .page-title-block .page-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .page-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+    .page-body { flex: 1; overflow-y: auto; padding: 20px 28px 28px; }
+
+    /* ── Buttons ── */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: opacity .15s; }
+    .btn:hover { opacity: .85; }
+    .btn-primary  { background: var(--blue);    color: #fff; }
+    .btn-ghost    { background: var(--surface2); color: var(--text-dim); }
+    .btn-red      { background: var(--red);     color: #fff; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn-icon { padding: 5px 8px; background: transparent; color: var(--muted); font-size: 14px; border-radius: 5px; border: none; cursor: pointer; }
+    .btn-icon:hover { background: var(--surface2); color: var(--text); }
+
+    /* ── Cards ── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .section-title { font-size: 13px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border-bottom: 1px solid var(--border); }
+    td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    .td-name { font-weight: 500; }
+    .td-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .td-match { font-family: var(--mono); font-size: 11px; color: var(--text-dim); background: var(--surface2); padding: 2px 6px; border-radius: 4px; display: inline-block; }
+    .td-match + .td-match { margin-left: 4px; }
+    .td-actions { display: flex; gap: 4px; justify-content: flex-end; }
+
+    /* ── Pills ── */
+    .pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .pill.allow   { background: rgba(34,197,94,.15);  color: var(--green); }
+    .pill.deny    { background: rgba(239,68,68,.15);  color: var(--red); }
+    .pill.pending { background: rgba(245,158,11,.15); color: var(--amber); }
+
+    /* ── Health panel ── */
+    .health-bar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .health-badge { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+    .health-badge.error   { background: rgba(239,68,68,.12);  color: var(--red); }
+    .health-badge.warning { background: rgba(245,158,11,.12); color: var(--amber); }
+    .health-badge.info    { background: rgba(59,130,246,.12); color: var(--blue); }
+    .health-badge.ok      { background: rgba(34,197,94,.12);  color: var(--green); }
+    .finding-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .finding-row:last-child { border-bottom: none; }
+    .finding-sev { flex-shrink: 0; width: 64px; }
+    .finding-msg { flex: 1; color: var(--text); line-height: 1.4; }
+    .finding-rule { color: var(--muted); font-family: var(--mono); font-size: 11px; display: block; margin-top: 2px; }
+    .health-ok-msg { padding: 16px 12px; font-size: 13px; color: var(--muted); text-align: center; }
+
+    /* ── Rule-maker tab layout ── */
+    .rulemaker-layout { display: grid; grid-template-columns: 1fr 300px; gap: 20px; height: 100%; min-height: 0; }
+    @media (max-width: 900px) { .rulemaker-layout { grid-template-columns: 1fr; } }
+
+    /* ── Inline chat ── */
+    .chat-container { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-height: 0; height: 100%; overflow: hidden; }
+    .chat-header { padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .chat-header-title { font-size: 14px; font-weight: 600; }
+    .chat-header-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+    .chat-msg { max-width: 88%; padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+    .chat-msg.user { align-self: flex-end; background: var(--blue); color: #fff; border-bottom-right-radius: 3px; }
+    .chat-msg.assistant { align-self: flex-start; background: var(--surface2); color: var(--text); border-bottom-left-radius: 3px; }
+    .chat-msg.system { align-self: center; background: rgba(34,197,94,.12); color: var(--green); font-size: 12px; border-radius: 6px; padding: 6px 12px; }
+    .chat-rule-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 8px; font-size: 12px; align-self: flex-start; width: 88%; }
+    .chat-rule-card-title { font-weight: 600; margin-bottom: 6px; color: var(--text); }
+    .chat-rule-card pre { font-family: var(--mono); font-size: 11px; background: var(--surface2); padding: 8px 10px; border-radius: 5px; margin-bottom: 8px; overflow-x: auto; white-space: pre; }
+    .chat-rule-actions { display: flex; gap: 8px; }
+    .chat-input-row { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0; }
+    .chat-input-row input { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 8px; font-size: 13px; font-family: var(--sans); }
+    .chat-input-row input:focus { outline: none; border-color: var(--blue); }
+    .chat-input-row input::placeholder { color: var(--muted); }
+    .chat-send { background: var(--blue); color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 500; cursor: pointer; }
+    .chat-send:hover { opacity: .85; }
+
+    /* ── Skill sidebar ── */
+    .skill-sidebar { display: flex; flex-direction: column; gap: 16px; }
+    .skill-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+    .skill-card-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .skill-card-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+    .skill-actions { display: flex; flex-direction: column; gap: 8px; }
+    .skill-file-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .skill-preview { font-family: var(--mono); font-size: 11px; background: var(--surface2); padding: 10px; border-radius: 6px; color: var(--text-dim); white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto; border: 1px solid var(--border); margin-top: 10px; }
+
+    /* ── Modal ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 24px; width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
+    .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 18px; }
+    .form-row { margin-bottom: 14px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 5px; }
+    input, select, textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: 6px; font-size: 13px; font-family: var(--sans); }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); }
+    textarea { font-family: var(--sans); resize: vertical; }
+    .form-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .form-row-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    .modal-section { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 18px 0 10px; }
+
+    /* ── Banner ── */
+    .banner { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+    .banner.warning { background: rgba(245,158,11,.12); border: 1px solid var(--amber-dim); color: var(--amber); }
+    .banner.info  { background: rgba(59,130,246,.12); border: 1px solid var(--blue-dim); color: var(--blue); }
+
+    /* ── Empty state ── */
+    .empty-state { text-align: center; padding: 60px 0; color: var(--muted); font-size: 13px; }
+    .empty-icon { font-size: 32px; margin-bottom: 10px; }
+
+    .mono { font-family: var(--mono); }
+    .muted { color: var(--muted); }
+
+    /* ── Simulate tab ── */
+    .sim-layout { display: flex; flex-direction: column; gap: 20px; height: 100%; min-height: 0; }
+
+    /* sentence form */
+    .sim-form-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px 28px; flex-shrink: 0; }
+    .sim-sentence { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; line-height: 2.4; margin-bottom: 20px; }
+    .sim-word { font-size: 17px; color: var(--muted); font-weight: 400; user-select: none; white-space: nowrap; }
+    .sim-word.accent { color: var(--text-dim); font-weight: 500; }
+    .sim-inline { display: inline-block; border: none; border-bottom: 2px solid var(--border); background: transparent; color: var(--text); font-size: 17px; font-family: var(--mono); font-weight: 600; padding: 0 3px 2px; outline: none; min-width: 20px; transition: border-color .15s; vertical-align: baseline; }
+    .sim-inline::placeholder { color: var(--border); font-weight: 400; font-family: var(--sans); font-style: italic; }
+    .sim-inline:focus { border-bottom-color: var(--blue); }
+    .sim-inline.required:focus { border-bottom-color: var(--blue); }
+    .sim-inline.required.empty { border-bottom-color: var(--border); }
+    .sim-inline.shake { animation: shake .3s ease; border-bottom-color: var(--red) !important; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+
+    .sim-bottom-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .sim-preset-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-right: 4px; }
+    .sim-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .sim-preset { font-size: 11px; padding: 4px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-dim); cursor: pointer; font-family: var(--mono); }
+    .sim-preset:hover { border-color: var(--blue); color: var(--blue); background: rgba(37,99,235,.06); }
+    .sim-run-btn { background: var(--blue); color: #fff; border: none; border-radius: 6px; padding: 9px 22px; font-size: 14px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+    .sim-run-btn:hover { opacity: .87; }
+
+    .sim-result-pane { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; }
+
+    /* verdict block */
+    .verdict-block { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 22px; display: flex; align-items: center; gap: 20px; }
+    .verdict-icon { font-size: 36px; flex-shrink: 0; }
+    .verdict-text-group { flex: 1; }
+    .verdict-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
+    .verdict-value { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+    .verdict-value.allow   { color: var(--green); }
+    .verdict-value.deny    { color: var(--red); }
+    .verdict-value.pending { color: var(--amber); }
+    .verdict-value.no-match { color: var(--muted); }
+    .verdict-rule { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+    .verdict-rule strong { color: var(--text); }
+    .verdict-block.allow-bg   { border-color: rgba(34,197,94,.4);  background: rgba(34,197,94,.04); }
+    .verdict-block.deny-bg    { border-color: rgba(239,68,68,.4);  background: rgba(239,68,68,.04); }
+    .verdict-block.pending-bg { border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.04); }
+
+    /* trace */
+    .trace-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .trace-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; align-items: center; justify-content: space-between; }
+    .trace-row { display: flex; align-items: flex-start; gap: 0; border-bottom: 1px solid var(--border); transition: background .1s; }
+    .trace-row:last-child { border-bottom: none; }
+    .trace-row.fired { background: rgba(37,99,235,.04); }
+    .trace-row.skipped { opacity: .5; }
+    .trace-gutter { width: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 12px 0; font-size: 16px; }
+    .trace-body { flex: 1; padding: 11px 14px 11px 0; }
+    .trace-rule-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .trace-rule-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+    .trace-conditions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .trace-cond { font-size: 11px; font-family: var(--mono); padding: 2px 8px; border-radius: 10px; display: flex; align-items: center; gap: 4px; }
+    .trace-cond.matched  { background: rgba(34,197,94,.12);  color: var(--green); }
+    .trace-cond.skipped-cond  { background: rgba(239,68,68,.10);  color: var(--red); }
+    .trace-cond.wildcard { background: var(--surface2); color: var(--muted); }
+    .trace-verdict-badge { flex-shrink: 0; padding: 11px 14px 11px 0; display: flex; align-items: center; }
+
+    .sim-empty { text-align: center; padding: 60px 0; color: var(--muted); font-size: 13px; }
+    .sim-empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+    /* ── Mockup nav bar ── */
+    .mockup-note { position: fixed; bottom: 16px; right: 20px; background: var(--text); color: #fff; font-size: 11px; padding: 6px 12px; border-radius: 20px; z-index: 999; opacity: 0.7; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════
+     LOGIN SCREEN
+══════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">Policy Maker</div>
+    <div class="login-sub">Explore and build AI agent policies</div>
+
+    <div class="login-field">
+      <label>Email address</label>
+      <input type="email" placeholder="you@example.com" value="" id="login-email" />
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" placeholder="••••••••" value="ZPR" id="login-password" />
+      <div class="login-hint">Use any email. Password is fixed for this sandbox.</div>
+    </div>
+    <button class="login-btn" onclick="doLogin()">Sign in</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════════ -->
+<aside>
+  <div class="brand">
+    <div class="brand-name">Policy Maker</div>
+    <div class="brand-sub">Policy explorer &amp; builder</div>
+  </div>
+  <nav>
+    <div class="nav-item active" id="nav-policies" onclick="showPage('policies', this)">
+      <span class="nav-icon">📋</span> Policies
+    </div>
+    <div class="nav-item" id="nav-rulemaker" onclick="showPage('rulemaker', this)">
+      <span class="nav-icon">✦</span> Rule-maker
+    </div>
+    <div class="nav-item" id="nav-simulate" onclick="showPage('simulate', this)">
+      <span class="nav-icon">▷</span> Simulate
+    </div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-row">
+      <span style="font-size:16px;">👤</span>
+      <span class="user-email" id="sidebar-email">alice@example.com</span>
+      <button class="logout-btn" onclick="doLogout()">Sign out</button>
+    </div>
+    <div class="status-row">
+      <div class="status-dot"></div>
+      <span class="status-label">Ready · 8 rules loaded</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════════════════════════════════════════════
+     MAIN
+══════════════════════════════════════════════════ -->
+<main>
+
+  <!-- ────────────────────────────────────────────
+       POLICIES PAGE
+  ──────────────────────────────────────────── -->
+  <div class="page active" id="page-policies">
+    <div class="page-header">
+      <div class="page-title-block">
+        <div class="page-title">Policies</div>
+        <div class="page-sub">Define rules that control what actions agents are allowed to take</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('import-modal')">↑ Import YAML</button>
+        <button class="btn btn-ghost btn-sm" onclick="alert('Downloads rule set as policies.yaml')">↓ Export</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleHealth()">⬡ Analyze</button>
+        <button class="btn btn-red btn-sm" onclick="alert('Deletes all non-protected rules')">Delete all</button>
+        <button class="btn btn-primary btn-sm" onclick="openModal('add-rule-modal')">+ Add rule</button>
+      </div>
+    </div>
+    <div class="page-body">
+
+      <!-- Health panel (collapsed by default, shown after Analyze) -->
+      <div id="health-panel" style="display:none; margin-bottom:20px;">
+        <div class="section-header">
+          <span class="section-title">Policy Health</span>
+          <button class="btn btn-ghost btn-sm" onclick="toggleHealth()">✕ Close</button>
+        </div>
+        <div class="card">
+          <div style="padding:12px 12px 8px;">
+            <div class="health-bar">
+              <div class="health-badge error">✕ 1 error</div>
+              <div class="health-badge warning">⚠ 2 warnings</div>
+              <div class="health-badge info">ℹ 1 info</div>
+            </div>
+          </div>
+          <div class="finding-row">
+            <div class="finding-sev"><span class="pill deny" style="font-size:10px;">error</span></div>
+            <div class="finding-msg">
+              Rule shadows a higher-priority rule — this rule can never be reached.
+              <span class="finding-rule">rule: allow-git-ops → shadowed by: deny-git-main</span>
+            </div>
+          </div>
+          <div class="finding-row">
+            <div class="finding-sev"><span class="pill pending" style="font-size:10px;">warning</span></div>
+            <div class="finding-msg">
+              Overly broad allow rule matches all tools with no path or program condition.
+              <span class="finding-rule">rule: allow-all-dev</span>
+            </div>
+          </div>
+          <div class="finding-row">
+            <div class="finding-sev"><span class="pill pending" style="font-size:10px;">warning</span></div>
+            <div class="finding-msg">
+              Rule references group "contractors" but no identity in this policy set belongs to that group.
+              <span class="finding-rule">rule: deny-contractors-prod</span>
+            </div>
+          </div>
+          <div class="finding-row">
+            <div class="finding-sev"><span class="pill allow" style="font-size:10px;">info</span></div>
+            <div class="finding-msg">
+              Rule has not matched any recent activity.
+              <span class="finding-rule">rule: deny-rm-rf</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Policy table -->
+      <div class="section-header">
+        <span class="section-title">Rules — <span style="font-weight:400;">8 active</span></span>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:28%">Rule</th>
+              <th style="width:10%">Result</th>
+              <th style="width:42%">Match conditions</th>
+              <th style="width:8%" title="Priority">Pri.</th>
+              <th style="width:12%"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="td-name">Deny all shell in prod</div>
+                <div class="td-desc">Block bash/sh execution outside dev directories</div>
+              </td>
+              <td><span class="pill deny">deny</span></td>
+              <td>
+                <span class="td-match">tool: bash</span>
+                <span class="td-match">path: /prod/**</span>
+              </td>
+              <td class="muted mono" style="font-size:12px;">200</td>
+              <td>
+                <div class="td-actions">
+                  <button class="btn-icon" onclick="openModal('edit-rule-modal')" title="Edit">✎</button>
+                  <button class="btn-icon" style="color:var(--red)" onclick="alert('Delete this rule?')" title="Delete">✕</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="td-name">Allow git operations</div>
+                <div class="td-desc">Permit git commands in any project directory</div>
+              </td>
+              <td><span class="pill allow">allow</span></td>
+              <td>
+                <span class="td-match">tool: bash</span>
+                <span class="td-match">program: git</span>
+              </td>
+              <td class="muted mono" style="font-size:12px;">150</td>
+              <td>
+                <div class="td-actions">
+                  <button class="btn-icon" onclick="openModal('edit-rule-modal')" title="Edit">✎</button>
+                  <button class="btn-icon" style="color:var(--red)" onclick="alert('Delete this rule?')" title="Delete">✕</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="td-name">Require approval — network</div>
+                <div class="td-desc">All outbound network calls need human sign-off</div>
+              </td>
+              <td><span class="pill pending">pending</span></td>
+              <td>
+                <span class="td-match">tool: web_fetch</span>
+              </td>
+              <td class="muted mono" style="font-size:12px;">130</td>
+              <td>
+                <div class="td-actions">
+                  <button class="btn-icon" onclick="openModal('edit-rule-modal')" title="Edit">✎</button>
+                  <button class="btn-icon" style="color:var(--red)" onclick="alert('Delete this rule?')" title="Delete">✕</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="td-name">Deny git push to main</div>
+                <div class="td-desc">Prevent direct pushes to the main branch</div>
+              </td>
+              <td><span class="pill deny">deny</span></td>
+              <td>
+                <span class="td-match">tool: bash</span>
+                <span class="td-match">program: git</span>
+                <span class="td-match">path: *main*</span>
+              </td>
+              <td class="muted mono" style="font-size:12px;">120</td>
+              <td>
+                <div class="td-actions">
+                  <button class="btn-icon" onclick="openModal('edit-rule-modal')" title="Edit">✎</button>
+                  <button class="btn-icon" style="color:var(--red)" onclick="alert('Delete this rule?')" title="Delete">✕</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="td-name">Allow read-only file access</div>
+                <div class="td-desc">Agents may read files but not write outside home</div>
+              </td>
+              <td><span class="pill allow">allow</span></td>
+              <td>
+                <span class="td-match">tool: read</span>
+              </td>
+              <td class="muted mono" style="font-size:12px;">100</td>
+              <td>
+                <div class="td-actions">
+                  <button class="btn-icon" onclick="openModal('edit-rule-modal')" title="Edit">✎</button>
+                  <button class="btn-icon" style="color:var(--red)" onclick="alert('Delete this rule?')" title="Delete">✕</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="td-name">Deny rm -rf</div>
+                <div class="td-desc">Never allow recursive delete commands</div>
+              </td>
+              <td><span class="pill deny">deny</span></td>
+              <td>
+                <span class="td-match">tool: bash</span>
+                <span class="td-match">program: rm</span>
+              </td>
+              <td class="muted mono" style="font-size:12px;">100</td>
+              <td>
+                <div class="td-actions">
+                  <span class="muted" style="font-size:11px;padding:0 6px;" title="Protected rule">🔒</span>
+                  <button class="btn-icon" onclick="openModal('edit-rule-modal')" title="Edit">✎</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="td-name">Allow dev tools</div>
+                <div class="td-desc">Permit npm, node, and python in dev paths</div>
+              </td>
+              <td><span class="pill allow">allow</span></td>
+              <td>
+                <span class="td-match">tool: bash</span>
+                <span class="td-match">path: /dev/**</span>
+              </td>
+              <td class="muted mono" style="font-size:12px;">90</td>
+              <td>
+                <div class="td-actions">
+                  <button class="btn-icon" onclick="openModal('edit-rule-modal')" title="Edit">✎</button>
+                  <button class="btn-icon" style="color:var(--red)" onclick="alert('Delete this rule?')" title="Delete">✕</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="td-name">Deny everything else</div>
+                <div class="td-desc">Catch-all deny for unmatched tool calls</div>
+              </td>
+              <td><span class="pill deny">deny</span></td>
+              <td>
+                <span class="muted" style="font-size:12px;">— (catch-all)</span>
+              </td>
+              <td class="muted mono" style="font-size:12px;">1</td>
+              <td>
+                <div class="td-actions">
+                  <button class="btn-icon" onclick="openModal('edit-rule-modal')" title="Edit">✎</button>
+                  <button class="btn-icon" style="color:var(--red)" onclick="alert('Delete this rule?')" title="Delete">✕</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       RULE-MAKER PAGE
+  ──────────────────────────────────────────── -->
+  <div class="page" id="page-rulemaker">
+    <div class="page-header" style="padding-bottom:0;">
+      <div class="page-title-block">
+        <div class="page-title">Rule-maker</div>
+        <div class="page-sub">Describe a policy in plain English — the assistant will propose a rule</div>
+      </div>
+    </div>
+    <div class="page-body" style="display:flex;flex-direction:column;min-height:0;flex:1;padding-top:16px;">
+      <div class="rulemaker-layout" style="flex:1;min-height:0;">
+
+        <!-- Chat panel -->
+        <div class="chat-container">
+          <div class="chat-header">
+            <div class="chat-header-title">Policy Assistant</div>
+            <div class="chat-header-sub">Powered by Claude · Rules accepted here appear in your Policies tab</div>
+          </div>
+          <div class="chat-messages" id="chat-messages">
+
+            <div class="chat-msg assistant">Hi! Describe a rule you'd like to add and I'll propose the YAML for it. For example:
+
+"Block all shell commands that run outside /home"
+"Require approval for any npm install"
+"Allow read-only file access for all tools"</div>
+
+            <div class="chat-msg user">Don't let the agent push to any remote git repository</div>
+
+            <div class="chat-msg assistant">Got it. I'll create a deny rule for <code>git push</code> commands regardless of the target remote.</div>
+
+            <div class="chat-rule-card">
+              <div class="chat-rule-card-title">Proposed rule</div>
+              <pre>id: deny-git-push
+name: Deny git push to any remote
+description: >
+  Block git push commands to prevent
+  unintended writes to remote repositories.
+result: deny
+priority: 180
+match:
+  tool: bash
+  program: git
+  path: "*push*"</pre>
+              <div class="chat-rule-actions">
+                <button class="btn btn-primary btn-sm" onclick="simulateAccept(this)">✓ Accept</button>
+                <button class="btn btn-ghost btn-sm">✎ Edit first</button>
+                <button class="btn btn-ghost btn-sm">✕ Discard</button>
+              </div>
+            </div>
+
+            <div class="chat-msg user">Also block npm publish</div>
+
+            <div class="chat-msg assistant">Here's a deny rule for <code>npm publish</code>:</div>
+
+            <div class="chat-rule-card">
+              <div class="chat-rule-card-title">Proposed rule</div>
+              <pre>id: deny-npm-publish
+name: Deny npm publish
+description: >
+  Block npm publish to prevent accidental
+  package releases.
+result: deny
+priority: 170
+match:
+  tool: bash
+  program: npm
+  path: "*publish*"</pre>
+              <div class="chat-rule-actions">
+                <button class="btn btn-primary btn-sm" onclick="simulateAccept(this)">✓ Accept</button>
+                <button class="btn btn-ghost btn-sm">✎ Edit first</button>
+                <button class="btn btn-ghost btn-sm">✕ Discard</button>
+              </div>
+            </div>
+
+          </div>
+          <div class="chat-input-row">
+            <input type="text" placeholder="Describe a rule in plain English…" id="chat-input" onkeydown="if(event.key==='Enter')sendChat()" />
+            <button class="chat-send" onclick="sendChat()">Send</button>
+          </div>
+        </div>
+
+        <!-- Skill sidebar -->
+        <div class="skill-sidebar">
+          <div class="skill-card">
+            <div class="skill-card-title">Agent Skill Prompt</div>
+            <div class="skill-card-sub">The system prompt that defines how the assistant generates rules. Customize it to match your policy style or domain.</div>
+            <div class="skill-actions">
+              <button class="btn btn-ghost btn-sm" onclick="alert('Downloads skill.txt — your current assistant prompt')">↓ Download skill</button>
+              <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+                ↑ Upload skill
+                <input type="file" accept=".txt" style="display:none" onchange="handleSkillUpload(this)" />
+              </label>
+              <button class="btn btn-ghost btn-sm" onclick="alert('Resets to the default Policy Maker skill prompt')">↺ Reset to default</button>
+            </div>
+            <div class="skill-preview" id="skill-preview">You are a policy rule authoring assistant for an AI agent governance system.
+
+Your job is to convert plain-English descriptions into YAML policy rules.
+
+Rules have these fields: id, name, description, result (allow/deny/pending), priority (integer), and optional match conditions: tool, program, path, person, group.
+
+When proposing a rule:
+1. Choose a clear, kebab-case id
+2. Set priority thoughtfully (higher = evaluated first)
+3. Explain your reasoning briefly before showing the YAML
+4. Warn about potential conflicts with existing rules
+…</div>
+          </div>
+
+          <div class="skill-card">
+            <div class="skill-card-title">Tips</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+              <p style="margin-bottom:8px;">Rules are evaluated <strong style="color:var(--text);">highest priority first</strong> — the first match wins.</p>
+              <p style="margin-bottom:8px;">Use <strong style="color:var(--text);">deny</strong> for hard blocks, <strong style="color:var(--text);">pending</strong> for human-in-the-loop approval.</p>
+              <p>After accepting rules, run <strong style="color:var(--text);">Analyze</strong> on the Policies tab to check for conflicts and shadows.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────
+       SIMULATE PAGE
+  ──────────────────────────────────────────── -->
+  <div class="page" id="page-simulate">
+    <div class="page-header">
+      <div class="page-title-block">
+        <div class="page-title">Simulate</div>
+        <div class="page-sub">Test an action request against your rules and see which rule fires</div>
+      </div>
+    </div>
+    <div class="page-body" style="display:flex;flex-direction:column;min-height:0;flex:1;padding-top:16px;">
+      <div class="sim-layout" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Sentence form + results stacked vertically -->
+        <div class="sim-form-card">
+          <div class="sim-sentence">
+            <input class="sim-inline" id="sim-person" placeholder="anyone"
+                   size="8" oninput="autosize(this)" onkeydown="simEnter(event)" />
+            <span class="sim-word">in group</span>
+            <input class="sim-inline" id="sim-group" placeholder="any group"
+                   size="9" oninput="autosize(this)" onkeydown="simEnter(event)" />
+            <span class="sim-word accent">calls</span>
+            <input class="sim-inline required" id="sim-tool" placeholder="tool"
+                   size="5" oninput="autosize(this)" onkeydown="simEnter(event)" />
+            <input class="sim-inline" id="sim-program" placeholder="program"
+                   size="7" oninput="autosize(this)" onkeydown="simEnter(event)" />
+            <span class="sim-word">on path</span>
+            <input class="sim-inline" id="sim-path" placeholder="any path"
+                   size="14" oninput="autosize(this)" onkeydown="simEnter(event)" />
+          </div>
+          <div class="sim-bottom-row">
+            <div class="sim-presets">
+              <span class="sim-preset-label">Try:</span>
+              <span class="sim-preset" onclick="loadPreset('','','bash','git','')">git commit</span>
+              <span class="sim-preset" onclick="loadPreset('','','bash','git','/prod/repo')">git in /prod</span>
+              <span class="sim-preset" onclick="loadPreset('','','bash','rm','')">rm command</span>
+              <span class="sim-preset" onclick="loadPreset('','','web_fetch','','')">web fetch</span>
+              <span class="sim-preset" onclick="loadPreset('','','read','','/etc/passwd')">read file</span>
+              <span class="sim-preset" onclick="loadPreset('alice','engineering','bash','npm','/dev/app')">alice · npm in /dev</span>
+            </div>
+            <button class="sim-run-btn" onclick="runSimulation()">▷ Evaluate</button>
+          </div>
+        </div>
+
+        <!-- Result pane -->
+        <div class="sim-result-pane" id="sim-result-pane" style="flex:1;min-height:0;overflow-y:auto;">
+          <div class="sim-empty">
+            <div class="sim-empty-icon">▷</div>
+            Fill in the blanks above and click <strong>Evaluate</strong><br/>to see how your rules respond.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══════════════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════════ -->
+
+<!-- Add Rule Modal -->
+<div class="modal-overlay" id="add-rule-modal">
+  <div class="modal">
+    <div class="modal-title">Add rule</div>
+
+    <div class="form-row-inline">
+      <div class="form-row" style="margin-bottom:0">
+        <label>Rule ID</label>
+        <input type="text" placeholder="deny-git-push" id="new-id" />
+        <div class="form-hint">Unique kebab-case identifier</div>
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label>Priority</label>
+        <input type="number" placeholder="100" value="100" />
+        <div class="form-hint">Higher = evaluated first</div>
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-top:14px;">
+      <label>Name</label>
+      <input type="text" placeholder="Human-readable rule name" />
+    </div>
+
+    <div class="form-row">
+      <label>Description</label>
+      <textarea rows="2" placeholder="What does this rule do?"></textarea>
+    </div>
+
+    <div class="form-row">
+      <label>Result</label>
+      <select>
+        <option value="allow">allow — permit the action</option>
+        <option value="deny" selected>deny — block the action</option>
+        <option value="pending">pending — require human approval</option>
+      </select>
+    </div>
+
+    <div class="modal-section">Match conditions <span style="font-weight:400;text-transform:none;font-size:11px;">(leave blank to match all)</span></div>
+
+    <div class="form-row-inline">
+      <div class="form-row" style="margin-bottom:0">
+        <label>Tool</label>
+        <input type="text" placeholder="bash, read, write…" />
+        <div class="form-hint">Exact tool name</div>
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label>Program</label>
+        <input type="text" placeholder="git, npm, python…" />
+        <div class="form-hint">Executable name</div>
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-top:14px;">
+      <label>Path (glob)</label>
+      <input type="text" placeholder="/home/project/**" />
+      <div class="form-hint">Glob pattern matched against file paths or arguments</div>
+    </div>
+
+    <div class="form-row-inline" style="margin-top:14px;">
+      <div class="form-row" style="margin-bottom:0">
+        <label>Person</label>
+        <input type="text" placeholder="alice" />
+        <div class="form-hint">Identity ID (optional)</div>
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label>Group</label>
+        <input type="text" placeholder="engineering" />
+        <div class="form-hint">Group name (optional)</div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('add-rule-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="closeModal('add-rule-modal');alert('Rule saved!')">Save rule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Rule Modal (pre-filled example) -->
+<div class="modal-overlay" id="edit-rule-modal">
+  <div class="modal">
+    <div class="modal-title">Edit rule</div>
+
+    <div class="form-row-inline">
+      <div class="form-row" style="margin-bottom:0">
+        <label>Rule ID</label>
+        <input type="text" value="allow-git-ops" />
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label>Priority</label>
+        <input type="number" value="150" />
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-top:14px;">
+      <label>Name</label>
+      <input type="text" value="Allow git operations" />
+    </div>
+
+    <div class="form-row">
+      <label>Description</label>
+      <textarea rows="2">Permit git commands in any project directory</textarea>
+    </div>
+
+    <div class="form-row">
+      <label>Result</label>
+      <select>
+        <option value="allow" selected>allow — permit the action</option>
+        <option value="deny">deny — block the action</option>
+        <option value="pending">pending — require human approval</option>
+      </select>
+    </div>
+
+    <div class="modal-section">Match conditions</div>
+
+    <div class="form-row-inline">
+      <div class="form-row" style="margin-bottom:0">
+        <label>Tool</label>
+        <input type="text" value="bash" />
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label>Program</label>
+        <input type="text" value="git" />
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-top:14px;">
+      <label>Path (glob)</label>
+      <input type="text" value="" placeholder="(any path)" />
+    </div>
+
+    <div class="form-row-inline" style="margin-top:14px;">
+      <div class="form-row" style="margin-bottom:0">
+        <label>Person</label>
+        <input type="text" value="" placeholder="(any person)" />
+      </div>
+      <div class="form-row" style="margin-bottom:0">
+        <label>Group</label>
+        <input type="text" value="" placeholder="(any group)" />
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('edit-rule-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="closeModal('edit-rule-modal');alert('Changes saved!')">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import YAML Modal -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-title">Import rules from YAML</div>
+    <div class="banner info" style="display:block;">Imported rules will be merged with your existing set. Rules with duplicate IDs will overwrite the existing rule.</div>
+    <div class="form-row">
+      <label>Paste YAML or upload a file</label>
+      <textarea rows="8" placeholder="- id: my-rule&#10;  name: My Rule&#10;  result: allow&#10;  priority: 100&#10;  match:&#10;    tool: bash"></textarea>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:-6px;margin-bottom:14px;">
+      <span style="font-size:12px;color:var(--muted);">or</span>
+      <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+        Choose .yaml file
+        <input type="file" accept=".yaml,.yml" style="display:none" />
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('import-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="closeModal('import-modal');alert('Rules imported!')">Import</button>
+    </div>
+  </div>
+</div>
+
+<div class="mockup-note">← UI Mockup — click around to explore</div>
+
+<script>
+  // ── Login ──
+  function doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const pass  = document.getElementById('login-password').value;
+    if (!email) { alert('Enter an email address'); return; }
+    if (pass !== 'ZPR') { alert('Incorrect password'); return; }
+    document.getElementById('sidebar-email').textContent = email;
+    document.getElementById('login-screen').classList.add('hidden');
+  }
+
+  function doLogout() {
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-screen').classList.remove('hidden');
+  }
+
+  // ── Page nav ──
+  function showPage(name, el) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    el.classList.add('active');
+  }
+
+  // ── Modals ──
+  function openModal(id) {
+    document.getElementById(id).classList.add('open');
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+  document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  });
+
+  // ── Health panel toggle ──
+  function toggleHealth() {
+    const panel = document.getElementById('health-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // ── Chat ──
+  function sendChat() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    const messages = document.getElementById('chat-messages');
+
+    const userMsg = document.createElement('div');
+    userMsg.className = 'chat-msg user';
+    userMsg.textContent = text;
+    messages.appendChild(userMsg);
+    input.value = '';
+
+    setTimeout(() => {
+      const reply = document.createElement('div');
+      reply.className = 'chat-msg assistant';
+      reply.textContent = 'Analyzing your request and checking for conflicts with existing rules…';
+      messages.appendChild(reply);
+      messages.scrollTop = messages.scrollHeight;
+
+      setTimeout(() => {
+        const card = document.createElement('div');
+        card.className = 'chat-rule-card';
+        card.innerHTML = `
+          <div class="chat-rule-card-title">Proposed rule</div>
+          <pre>id: custom-rule-${Date.now().toString(36)}
+name: ${text.slice(0,40)}
+result: deny
+priority: 110
+match:
+  tool: bash</pre>
+          <div class="chat-rule-actions">
+            <button class="btn btn-primary btn-sm" onclick="simulateAccept(this)">✓ Accept</button>
+            <button class="btn btn-ghost btn-sm">✎ Edit first</button>
+            <button class="btn btn-ghost btn-sm">✕ Discard</button>
+          </div>`;
+        messages.appendChild(card);
+        messages.scrollTop = messages.scrollHeight;
+      }, 800);
+    }, 600);
+  }
+
+  function simulateAccept(btn) {
+    const card = btn.closest('.chat-rule-card');
+    const msg = document.createElement('div');
+    msg.className = 'chat-msg system';
+    msg.textContent = '✓ Rule added to your policy set';
+    card.after(msg);
+    card.style.opacity = '0.4';
+    card.querySelectorAll('button').forEach(b => b.disabled = true);
+    document.getElementById('chat-messages').scrollTop = 99999;
+  }
+
+  // ── Simulate ──
+
+  // Sample rules mirroring the Policies tab (sorted by priority desc)
+  const MOCK_RULES = [
+    { id: 'deny-shell-prod',     name: 'Deny all shell in prod',        result: 'deny',    priority: 200, match: { tool: 'bash',     path: '/prod/**' } },
+    { id: 'allow-git-ops',       name: 'Allow git operations',          result: 'allow',   priority: 150, match: { tool: 'bash',     program: 'git' } },
+    { id: 'require-network',     name: 'Require approval — network',    result: 'pending', priority: 130, match: { tool: 'web_fetch' } },
+    { id: 'deny-git-main',       name: 'Deny git push to main',         result: 'deny',    priority: 120, match: { tool: 'bash',     program: 'git', path: '*main*' } },
+    { id: 'allow-read',          name: 'Allow read-only file access',   result: 'allow',   priority: 100, match: { tool: 'read' } },
+    { id: 'deny-rm',             name: 'Deny rm -rf',                   result: 'deny',    priority: 100, match: { tool: 'bash',     program: 'rm' }, protected: true },
+    { id: 'allow-dev-tools',     name: 'Allow dev tools',               result: 'allow',   priority: 90,  match: { tool: 'bash',     path: '/dev/**' } },
+    { id: 'deny-all',            name: 'Deny everything else',          result: 'deny',    priority: 1,   match: {} },
+  ];
+
+  function globMatch(pattern, value) {
+    if (!pattern) return true;
+    if (!value) return false;
+    // Convert glob to regex: ** matches anything, * matches non-sep chars
+    const re = '^' + pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*\*/g, '§§')
+      .replace(/\*/g, '[^/]*')
+      .replace(/§§/g, '.*') + '$';
+    return new RegExp(re).test(value);
+  }
+
+  function evalRule(rule, req) {
+    const m = rule.match;
+    const conditions = [];
+    let passes = true;
+
+    // tool
+    if (m.tool) {
+      const ok = m.tool === req.tool;
+      conditions.push({ label: `tool: ${m.tool}`, matched: ok });
+      if (!ok) passes = false;
+    } else {
+      conditions.push({ label: 'tool: *', matched: true, wildcard: true });
+    }
+
+    // program
+    if (m.program) {
+      const ok = m.program === req.program;
+      conditions.push({ label: `program: ${m.program}`, matched: ok });
+      if (!ok) passes = false;
+    }
+
+    // path
+    if (m.path) {
+      const ok = globMatch(m.path, req.path);
+      conditions.push({ label: `path: ${m.path}`, matched: ok });
+      if (!ok) passes = false;
+    }
+
+    // person
+    if (m.person) {
+      const ok = m.person === req.person;
+      conditions.push({ label: `person: ${m.person}`, matched: ok });
+      if (!ok) passes = false;
+    }
+
+    // group
+    if (m.group) {
+      const ok = m.group === req.group;
+      conditions.push({ label: `group: ${m.group}`, matched: ok });
+      if (!ok) passes = false;
+    }
+
+    return { passes, conditions };
+  }
+
+  function autosize(el) {
+    // Resize inline input to its content
+    const tmp = document.createElement('span');
+    tmp.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font-size:17px;font-family:monospace;font-weight:600;';
+    tmp.textContent = el.value || el.placeholder;
+    document.body.appendChild(tmp);
+    el.style.width = (tmp.offsetWidth + 10) + 'px';
+    document.body.removeChild(tmp);
+  }
+
+  function simEnter(e) { if (e.key === 'Enter') runSimulation(); }
+
+  // init autosize on all inline inputs
+  document.querySelectorAll('.sim-inline').forEach(autosize);
+
+  function loadPreset(person, group, tool, program, path) {
+    const fields = { 'sim-person': person, 'sim-group': group, 'sim-tool': tool, 'sim-program': program, 'sim-path': path };
+    Object.entries(fields).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      el.value = val;
+      autosize(el);
+    });
+    runSimulation();
+  }
+
+  function runSimulation() {
+    const req = {
+      tool:    document.getElementById('sim-tool').value.trim(),
+      program: document.getElementById('sim-program').value.trim(),
+      path:    document.getElementById('sim-path').value.trim(),
+      person:  document.getElementById('sim-person').value.trim(),
+      group:   document.getElementById('sim-group').value.trim(),
+    };
+
+    if (!req.tool) {
+      const el = document.getElementById('sim-tool');
+      el.classList.add('shake');
+      el.focus();
+      setTimeout(() => el.classList.remove('shake'), 400);
+      return;
+    }
+
+    // Evaluate rules in priority order
+    let firedRule = null;
+    const trace = MOCK_RULES.map(rule => {
+      const { passes, conditions } = evalRule(rule, req);
+      if (passes && !firedRule) firedRule = rule;
+      return { rule, passes, conditions, fired: passes && rule === (firedRule || null) };
+    });
+    // Mark fired correctly (first match)
+    let found = false;
+    trace.forEach(t => {
+      t.fired = t.passes && !found;
+      if (t.passes && !found) found = true;
+    });
+
+    renderResult(req, firedRule, trace);
+  }
+
+  function renderResult(req, firedRule, trace) {
+    const pane = document.getElementById('sim-result-pane');
+
+    // ── Verdict block ──
+    let verdictHTML;
+    if (firedRule) {
+      const icons   = { allow: '✓', deny: '✕', pending: '⏳' };
+      const classes = { allow: 'allow-bg', deny: 'deny-bg', pending: 'pending-bg' };
+      verdictHTML = `
+        <div class="verdict-block ${classes[firedRule.result]}">
+          <div class="verdict-icon">${icons[firedRule.result]}</div>
+          <div class="verdict-text-group">
+            <div class="verdict-label">Verdict</div>
+            <div class="verdict-value ${firedRule.result}">${firedRule.result.toUpperCase()}</div>
+            <div class="verdict-rule">Matched rule <strong>${firedRule.name}</strong>
+              <span style="color:var(--muted);font-family:var(--mono);font-size:11px;margin-left:6px;">${firedRule.id}</span>
+              <span style="color:var(--muted);font-size:12px;margin-left:6px;">· priority ${firedRule.priority}</span>
+            </div>
+          </div>
+        </div>`;
+    } else {
+      verdictHTML = `
+        <div class="verdict-block">
+          <div class="verdict-icon">—</div>
+          <div class="verdict-text-group">
+            <div class="verdict-label">Verdict</div>
+            <div class="verdict-value no-match">NO MATCH</div>
+            <div class="verdict-rule">No rule matched this action. Behavior depends on your default policy.</div>
+          </div>
+        </div>`;
+    }
+
+    // ── Trace ──
+    const traceRows = trace.map(t => {
+      const rowClass = t.fired ? 'fired' : (!t.passes ? 'skipped' : '');
+      const gutter   = t.fired ? '→' : (t.passes ? '' : '');
+      const gutterStyle = t.fired
+        ? 'color:var(--blue);font-weight:700;font-size:14px;'
+        : t.passes ? 'color:var(--muted);font-size:12px;' : 'color:var(--muted);font-size:12px;';
+
+      const pillMap = { allow: 'allow', deny: 'deny', pending: 'pending' };
+      const condHTML = t.conditions.map(c => {
+        if (c.wildcard) return `<span class="trace-cond wildcard">— ${c.label}</span>`;
+        return c.matched
+          ? `<span class="trace-cond matched">✓ ${c.label}</span>`
+          : `<span class="trace-cond skipped-cond">✕ ${c.label}</span>`;
+      }).join('');
+
+      return `
+        <div class="trace-row ${rowClass}">
+          <div class="trace-gutter" style="${gutterStyle}">${gutter}</div>
+          <div class="trace-body">
+            <div class="trace-rule-name">${t.rule.name}</div>
+            <div class="trace-rule-meta">${t.rule.id} · priority ${t.rule.priority}</div>
+            <div class="trace-conditions">${condHTML}</div>
+          </div>
+          <div class="trace-verdict-badge">
+            <span class="pill ${pillMap[t.rule.result]}" style="font-size:10px;">${t.rule.result}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    pane.innerHTML = `
+      ${verdictHTML}
+      <div class="trace-card">
+        <div class="trace-header">
+          <span>Evaluation trace · ${trace.length} rules · highest priority first</span>
+          <span style="font-weight:400;letter-spacing:0;">→ = first match · fired rule wins</span>
+        </div>
+        ${traceRows}
+      </div>`;
+  }
+
+  function handleSkillUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('skill-preview').textContent = e.target.result.slice(0, 400) + (e.target.result.length > 400 ? '\n…' : '');
+      alert('Skill prompt uploaded. The assistant will use your custom prompt for future messages.');
+    };
+    reader.readAsText(file);
+  }
+</script>
+</body>
+</html>

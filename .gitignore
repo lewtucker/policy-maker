@@ -16,6 +16,9 @@ src/server/policy_maker.db
 # macOS
 .DS_Store
 
+# Local scratch files
+Telegram ID
+
 # Editor
 .idea/
 .vscode/

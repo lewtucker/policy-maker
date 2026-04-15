@@ -17,15 +17,22 @@ Agent B  → Bearer token-B  →  User B's rule set  →  User B's activity log
 Agent C  → Bearer token-C  →  User C's rule set  →  User C's activity log
 ```
 
-To add a new monitored system: create a Policy Maker account for it (any email), generate a token on the **Profile** page, and give that token to the agent. Everything else — rules, people, activity — is scoped to that account automatically.
+To add a new monitored system: create a Policy Maker account for it (any account name), set its token on the **Profile** page to match the agent token configured in OpenClaw, and everything else — rules, people, activity — is scoped to that account automatically.
 
 ---
 
-## Step 1: Generate an agent token
+## Step 1: Link your agent token
 
-Click your **email address** in the bottom-left of the sidebar to open your Profile page. Scroll to the **Agent Token** section and click **Generate**. Copy the token — you'll add it to your agent's configuration.
+Start Policy Maker and log in with whatever account name you choose (any string is accepted). Click your account name in the **bottom-left of the sidebar** to open your Profile page.
 
-If you prefer to use your own token string, type it into the field and click **Save**.
+From there you can:
+
+- **Change your password** if you want something other than the default
+- **Set your Agent Token** — this is the critical step
+
+In the **Agent Token** field, enter the token you set in OpenClaw at deploy time (via the `agentToken` config field or `OC_POLICY_AGENT_TOKEN` environment variable). This token is what connects your OpenClaw instance to this Policy Maker account: every request from OpenClaw carries the token, and Policy Maker uses it to look up and apply **your** rules.
+
+If you haven't configured OpenClaw yet, you can instead click **Generate** to create a token here and then use that value when you deploy OpenClaw.
 
 ---
 

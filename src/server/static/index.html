@@ -649,7 +649,7 @@
       </div>
 
       <!-- Change password -->
-      <div class="profile-card">
+      <div class="profile-card" id="profile-card-password">
         <div class="profile-section-title">Change Password</div>
         <div class="banner error" id="profile-pw-error"></div>
         <div class="banner success" id="profile-pw-success"></div>
@@ -670,8 +670,9 @@
       </div>
 
       <!-- Agent token -->
-      <div class="profile-card">
+      <div class="profile-card" id="profile-card-token">
         <div class="profile-section-title">Agent Token</div>
+        <div class="banner error" id="profile-token-error"></div>
         <div class="activity-token-row">
           <input class="activity-token-input" id="token-input" type="text" placeholder="Enter your own token or click Generate…" oninput="onTokenInput()" />
           <button class="btn-secondary" onclick="saveCustomToken()" id="btn-save-token" style="display:none;">Save</button>
@@ -684,6 +685,36 @@
           <code>OC_POLICY_SERVER_URL=https://policy.lewtucker.net</code><br/>
           <code>OC_POLICY_AGENT_TOKEN=&lt;your token&gt;</code>
         </div>
+      </div>
+
+      <!-- Account actions (non-admin) -->
+      <div class="profile-card" id="profile-card-actions">
+        <div class="profile-section-title">Account Actions</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <form method="POST" action="/logout" style="margin:0;">
+            <button type="submit" class="btn-secondary">Sign out</button>
+          </form>
+          <button class="btn-danger-sm" style="padding:6px 14px;" onclick="deleteAccount()">Delete account</button>
+        </div>
+      </div>
+
+      <!-- Admin panel -->
+      <div class="profile-card" id="profile-card-admin" style="display:none;">
+        <div class="profile-section-title">User Accounts</div>
+        <div class="banner error" id="admin-error"></div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;" id="admin-user-table">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);color:var(--muted);text-align:left;">
+              <th style="padding:6px 8px;font-weight:600;">Account</th>
+              <th style="padding:6px 8px;font-weight:600;">Joined</th>
+              <th style="padding:6px 8px;font-weight:600;">Last activity</th>
+              <th style="padding:6px 8px;"></th>
+            </tr>
+          </thead>
+          <tbody id="admin-user-rows">
+            <tr><td colspan="4" style="padding:12px 8px;color:var(--muted);">Loading…</td></tr>
+          </tbody>
+        </table>
       </div>
 
     </div>
@@ -1620,18 +1651,78 @@
 
   async function loadProfile() {
     const res = await api('GET', '/me');
-    if (res && res.ok) {
-      const data = await res.json();
-      document.getElementById('profile-email').textContent = data.email;
-      document.getElementById('profile-created').textContent =
-        new Date(data.created_at).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+    if (!res || !res.ok) return;
+    const data = await res.json();
+    document.getElementById('profile-email').textContent = data.email;
+    document.getElementById('profile-created').textContent = data.created_at
+      ? new Date(data.created_at).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' })
+      : 'Administrator';
+
+    const isAdmin = !!data.is_admin;
+    // Show/hide cards based on role
+    document.getElementById('profile-card-token').style.display  = isAdmin ? 'none' : '';
+    document.getElementById('profile-card-actions').style.display = isAdmin ? 'none' : '';
+    document.getElementById('profile-card-admin').style.display   = isAdmin ? '' : 'none';
+    // Also hide password card for admin
+    document.getElementById('profile-card-password').style.display = isAdmin ? 'none' : '';
+
+    if (isAdmin) {
+      loadAdminUsers();
+    } else {
+      // Load token into profile card
+      const res2 = await api('GET', '/token');
+      if (res2 && res2.ok) {
+        const d = await res2.json();
+        _currentToken = d.token;
+        renderToken(_currentToken);
+      }
     }
-    // Load token into profile card
-    const res2 = await api('GET', '/token');
-    if (res2 && res2.ok) {
-      const data = await res2.json();
-      _currentToken = data.token;
-      renderToken(_currentToken);
+  }
+
+  async function loadAdminUsers() {
+    const res = await api('GET', '/admin/users');
+    if (!res || !res.ok) return;
+    const data = await res.json();
+    const tbody = document.getElementById('admin-user-rows');
+    if (!data.users.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="padding:12px 8px;color:var(--muted);">No accounts yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.users.map(u => {
+      const joined = u.created_at
+        ? new Date(u.created_at).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' })
+        : '—';
+      const lastAct = u.last_activity
+        ? new Date(u.last_activity).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
+        : 'Never';
+      const safeEmail = u.email.replace(/"/g, '&quot;');
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 8px;font-family:var(--mono);font-size:12px;">${u.email}</td>
+        <td style="padding:8px 8px;color:var(--muted);">${joined}</td>
+        <td style="padding:8px 8px;color:var(--muted);">${lastAct}</td>
+        <td style="padding:8px 8px;text-align:right;">
+          <button class="btn-danger-sm" style="padding:3px 10px;font-size:11px;" onclick="deleteAdminUser('${safeEmail}')">Delete</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function deleteAdminUser(email) {
+    if (!confirm(`Delete account "${email}" and all their data? This cannot be undone.`)) return;
+    const res = await api('DELETE', `/admin/users/${encodeURIComponent(email)}`);
+    if (res && res.ok) {
+      loadAdminUsers();
+    } else {
+      const errEl = document.getElementById('admin-error');
+      errEl.textContent = 'Failed to delete account.'; errEl.classList.add('show');
+    }
+  }
+
+  async function deleteAccount() {
+    if (!confirm('Delete your account and all your policies, rules, and activity? This cannot be undone.')) return;
+    const res = await api('DELETE', '/account');
+    if (res && res.ok) {
+      window.location.href = '/login';
     }
   }
 
@@ -1724,10 +1815,15 @@
   async function saveCustomToken() {
     const val = document.getElementById('token-input').value.trim();
     if (!val) return;
+    const errEl = document.getElementById('profile-token-error');
+    errEl.textContent = ''; errEl.classList.remove('show');
     const res = await api('POST', '/token/set', { token: val });
     if (res && res.ok) {
       _currentToken = val;
       renderToken(_currentToken);
+    } else if (res) {
+      const data = await res.json().catch(() => ({}));
+      errEl.textContent = data.detail || 'Failed to save token.'; errEl.classList.add('show');
     }
   }
 

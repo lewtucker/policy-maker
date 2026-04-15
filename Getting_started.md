@@ -39,7 +39,7 @@ pip install -r requirements.txt
 uvicorn server:app --reload --port 8080
 ```
 
-Open `http://localhost:8080` in your browser. Log in with any email address and the password you set in `.env`.
+Open `http://localhost:8080` in your browser. Log in with any account name and the password you set in `.env`.
 
 ---
 

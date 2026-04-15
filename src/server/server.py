@@ -29,8 +29,10 @@ from policy_analyzer import analyze, summarize
 from nl_policy import create_chat_handler
 
 _server_dir = Path(__file__).parent
-SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
-APP_PASSWORD   = os.environ.get("APP_PASSWORD")
+SESSION_SECRET  = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
+APP_PASSWORD    = os.environ.get("APP_PASSWORD")
+ADMIN_USERNAME  = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD  = os.environ.get("ADMIN_PASSWORD", "demodemo")
 if not APP_PASSWORD:
     raise RuntimeError("APP_PASSWORD is not set. Add it to src/server/.env or the environment.")
 
@@ -110,7 +112,14 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(request: Request, email: str = Form(...), password: str = Form(...)):
     email = email.strip().lower()
-    if not email or not _check_login(email, password):
+    if not email:
+        return RedirectResponse("/login?error=1", status_code=303)
+    # Admin check first — admin has no DB row
+    if email == ADMIN_USERNAME.lower() and password == ADMIN_PASSWORD:
+        request.session["email"] = ADMIN_USERNAME.lower()
+        request.session["is_admin"] = True
+        return RedirectResponse("/", status_code=303)
+    if not _check_login(email, password):
         return RedirectResponse("/login?error=1", status_code=303)
     database.get_or_create_user(email)
     request.session["email"] = email
@@ -126,9 +135,12 @@ async def logout(request: Request):
 @app.get("/me")
 async def me(request: Request):
     email = _require_session(request)
+    is_admin = request.session.get("is_admin", False)
+    if is_admin:
+        return {"email": email, "rule_count": 0, "created_at": None, "is_admin": True}
     user = database.get_user(email)
     engine = _get_engine(email)
-    return {"email": email, "rule_count": len(engine.rules), "created_at": user["created_at"]}
+    return {"email": email, "rule_count": len(engine.rules), "created_at": user["created_at"], "is_admin": False}
 
 
 # ── Profile endpoints ─────────────────────────────────────────────────────────
@@ -147,6 +159,38 @@ async def change_password(body: ChangePasswordBody, request: Request):
         raise HTTPException(status_code=403, detail="Current password is incorrect")
     database.set_password_hash(email, _hash_password(body.new_password))
     return {"changed": True}
+
+
+@app.delete("/account")
+async def delete_account(request: Request):
+    email = _require_session(request)
+    if request.session.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin account cannot be deleted this way")
+    database.delete_user(email)
+    request.session.clear()
+    return {"deleted": True}
+
+
+# ── Admin endpoints ───────────────────────────────────────────────────────────
+
+def _require_admin(request: Request) -> str:
+    email = _require_session(request)
+    if not request.session.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+    return email
+
+
+@app.get("/admin/users")
+async def admin_list_users(request: Request):
+    _require_admin(request)
+    return {"users": database.get_all_users_with_activity()}
+
+
+@app.delete("/admin/users/{target_email}")
+async def admin_delete_user(target_email: str, request: Request):
+    _require_admin(request)
+    database.delete_user(target_email)
+    return {"deleted": True}
 
 
 # ── Policy endpoints ──────────────────────────────────────────────────────────
@@ -482,10 +526,14 @@ class TokenBody(BaseModel):
 @app.post("/token/set")
 async def set_token(body: TokenBody, request: Request):
     email = _require_session(request)
-    if not body.token.strip():
+    token = body.token.strip()
+    if not token:
         raise HTTPException(status_code=400, detail="Token cannot be empty")
-    database.save_agent_token(email, body.token.strip())
-    return {"token": body.token.strip()}
+    existing = database.get_email_by_token(token)
+    if existing and existing != email:
+        raise HTTPException(status_code=409, detail="Token is already in use by another account")
+    database.save_agent_token(email, token)
+    return {"token": token}
 
 
 @app.delete("/token")

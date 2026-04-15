@@ -162,6 +162,26 @@ def save_people(email: str, people: list) -> None:
         conn.commit()
 
 
+def delete_user(email: str) -> None:
+    with _conn() as conn:
+        conn.execute("DELETE FROM check_log WHERE email = ?", (email,))
+        conn.execute("DELETE FROM approvals WHERE email = ?", (email,))
+        conn.execute("DELETE FROM users WHERE email = ?", (email,))
+        conn.commit()
+
+
+def get_all_users_with_activity() -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT u.email, u.created_at, MAX(c.ts) as last_activity
+            FROM users u
+            LEFT JOIN check_log c ON c.email = u.email
+            GROUP BY u.email
+            ORDER BY last_activity IS NULL ASC, last_activity DESC
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+
 def get_email_by_token(token: str) -> str | None:
     with _conn() as conn:
         row = conn.execute(

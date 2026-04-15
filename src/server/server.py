@@ -660,10 +660,12 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
             rule_name = rule.name
             break
 
-    # Log the call (include resolved identity in params for display)
+    # Log the call — store raw caller_id (telegram ID) and resolved name separately
     log_params = dict(body.params)
     if caller_id:
-        log_params["_caller"] = person_id_str or caller_id
+        log_params["_caller"] = caller_id          # always the raw ID (e.g. tg:6741893378)
+        if person_name and person_name != caller_id:
+            log_params["_caller_name"] = person_name  # resolved display name (e.g. "Lew Tucker")
     database.log_check(
         email=email,
         tool=body.tool,

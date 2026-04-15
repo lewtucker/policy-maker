@@ -1881,18 +1881,27 @@
       const ts = new Date(r.ts).toLocaleString();
       let paramsObj = {};
       try { paramsObj = JSON.parse(r.params_json); } catch(e) {}
-      const caller = paramsObj['_caller'] || '';
-      const otherParams = Object.entries(paramsObj).filter(([k]) => k !== '_caller').map(([k,v]) => `${k}=${v}`).join(' · ');
+      const callerRaw  = paramsObj['_caller'] || '';       // telegram ID
+      const callerName = paramsObj['_caller_name'] || '';  // resolved name
+      const otherParams = Object.entries(paramsObj)
+        .filter(([k]) => k !== '_caller' && k !== '_caller_name')
+        .map(([k,v]) => `${k}=${v}`).join(' · ');
       const tokenShort = r.token ? r.token.slice(0, 10) + (r.token.length > 10 ? '…' : '') : '—';
-      const detail = JSON.stringify({ tool: r.tool, params: paramsObj, verdict: r.verdict, rule: r.rule_name || r.rule_id || null, token: r.token || null }, null, 2);
+      // Expanded detail: show caller as "tg:123456 [Lew Tucker]" if resolved
+      const callerDisplay = callerRaw
+        ? (callerName ? `${callerRaw} [${callerName}]` : callerRaw)
+        : null;
+      const detailObj = { tool: r.tool, params: Object.fromEntries(Object.entries(paramsObj).filter(([k]) => k !== '_caller' && k !== '_caller_name')), caller: callerDisplay, verdict: r.verdict, rule: r.rule_name || r.rule_id || null, token: r.token || null };
+      const detail = JSON.stringify(detailObj, null, 2);
       const isOpen = openIds.has(String(r.id));
       return `<details class="activity-row${isNew ? ' activity-row-new' : ''}" data-row-id="${r.id}"${isOpen ? ' open' : ''}>
         <summary>
           <span class="activity-chevron">▶</span>
           <span class="activity-ts">${esc(ts)}</span>
           <span class="activity-tool">${esc(r.tool)}</span>
-          ${caller ? `<span class="activity-params" style="color:var(--text);">${esc(caller)}</span>` : ''}
-          <span class="activity-params">${esc(otherParams) || '—'}</span>
+          ${callerName ? `<span class="activity-params" style="color:var(--text);font-weight:500;">${esc(callerName)}</span>` : ''}
+          ${callerRaw  ? `<span class="activity-params" style="color:var(--muted);font-family:var(--mono);font-size:11px;">${esc(callerRaw)}</span>` : ''}
+          <span class="activity-params">${esc(otherParams) || (callerRaw ? '' : '—')}</span>
           ${verdictPill(r.verdict)}
           <span class="activity-rule">${esc(r.rule_name || r.rule_id || '—')}</span>
         </summary>

@@ -340,6 +340,9 @@
     <div class="nav-item" id="nav-policies" onclick="showPage('policies',this)">
       <span class="nav-icon">📋</span> Policy Rules
     </div>
+    <div class="nav-item" id="nav-users" onclick="showPage('users',this)">
+      <span class="nav-icon">👥</span> Users
+    </div>
     <div class="nav-item" id="nav-approvals" onclick="showPage('approvals',this)" style="position:relative;">
       <span class="nav-icon">⏳</span> Approvals
       <span class="approval-badge" id="approval-badge" style="display:none;"></span>
@@ -506,11 +509,19 @@
         </table>
       </div>
 
-      <!-- People & Groups panel -->
-      <div class="section-header" style="margin-top:8px;">
-        <span class="section-title">People &amp; Groups</span>
-        <button class="btn btn-ghost btn-sm" onclick="openPeopleModal()">+ Add person</button>
+    </div>
+  </div>
+
+  <!-- ═══ USERS ═══ -->
+  <div class="page" id="page-users">
+    <div class="page-header">
+      <div class="page-title-block">
+        <div class="page-title">Users</div>
+        <div class="page-sub">People and groups that can be referenced in policy rules</div>
       </div>
+      <button class="btn btn-ghost btn-sm" onclick="openPeopleModal()">+ Add person</button>
+    </div>
+    <div class="page-body" style="padding-top:16px;">
       <div class="card">
         <table id="people-table">
           <thead>
@@ -527,7 +538,6 @@
           </tbody>
         </table>
       </div>
-
     </div>
   </div>
 
@@ -794,7 +804,7 @@
     <div class="form-row">
       <label>Telegram ID <span style="font-weight:400;color:var(--muted);">(tg:123456789)</span></label>
       <input type="text" id="p-telegram-id" placeholder="tg:6741893378" />
-      <div class="form-hint">Used to identify this person when nanoclaw calls /check</div>
+      <div class="form-hint">Used to identify this person when an agent calls /check</div>
     </div>
     <div class="banner error" id="people-modal-error"></div>
     <div class="modal-footer">
@@ -921,6 +931,7 @@
     document.getElementById('page-' + name).classList.add('active');
     el.classList.add('active');
     if (name === 'rulemaker') loadSkillPreview();
+    if (name === 'users') loadPeople();
     if (name === 'activity') startActivityPolling();
     if (name === 'approvals') startApprovalsPolling();
     if (name === 'profile') loadProfile();

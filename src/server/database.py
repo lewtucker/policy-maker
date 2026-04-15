@@ -44,7 +44,8 @@ def init_db() -> None:
                 params_json TEXT NOT NULL DEFAULT '{}',
                 verdict     TEXT NOT NULL,
                 rule_id     TEXT,
-                rule_name   TEXT
+                rule_name   TEXT,
+                token       TEXT
             )
         """)
         conn.execute("""
@@ -70,6 +71,13 @@ def init_db() -> None:
         ]:
             try:
                 conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+            except sqlite3.OperationalError:
+                pass
+        for col, definition in [
+            ("token", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE check_log ADD COLUMN {col} {definition}")
             except sqlite3.OperationalError:
                 pass
         conn.commit()
@@ -193,13 +201,13 @@ def get_email_by_token(token: str) -> str | None:
 # ── Check log ─────────────────────────────────────────────────────────────────
 
 def log_check(email: str, tool: str, params_json: str, verdict: str,
-              rule_id: str | None, rule_name: str | None) -> None:
+              rule_id: str | None, rule_name: str | None, token: str | None = None) -> None:
     with _conn() as conn:
         conn.execute(
-            """INSERT INTO check_log (email, ts, tool, params_json, verdict, rule_id, rule_name)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO check_log (email, ts, tool, params_json, verdict, rule_id, rule_name, token)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (email, datetime.now(timezone.utc).isoformat(), tool, params_json,
-             verdict, rule_id, rule_name),
+             verdict, rule_id, rule_name, token),
         )
         conn.commit()
 

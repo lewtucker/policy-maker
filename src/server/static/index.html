@@ -1881,20 +1881,23 @@
       const ts = new Date(r.ts).toLocaleString();
       let paramsObj = {};
       try { paramsObj = JSON.parse(r.params_json); } catch(e) {}
-      const paramsSummary = Object.entries(paramsObj).map(([k,v]) => `${k}=${v}`).join(' · ');
-      const detail = JSON.stringify({ tool: r.tool, params: paramsObj, verdict: r.verdict, rule: r.rule_name || r.rule_id || null }, null, 2);
+      const caller = paramsObj['_caller'] || '';
+      const otherParams = Object.entries(paramsObj).filter(([k]) => k !== '_caller').map(([k,v]) => `${k}=${v}`).join(' · ');
+      const tokenShort = r.token ? r.token.slice(0, 10) + (r.token.length > 10 ? '…' : '') : '—';
+      const detail = JSON.stringify({ tool: r.tool, params: paramsObj, verdict: r.verdict, rule: r.rule_name || r.rule_id || null, token: r.token || null }, null, 2);
       const isOpen = openIds.has(String(r.id));
       return `<details class="activity-row${isNew ? ' activity-row-new' : ''}" data-row-id="${r.id}"${isOpen ? ' open' : ''}>
         <summary>
           <span class="activity-chevron">▶</span>
           <span class="activity-ts">${esc(ts)}</span>
           <span class="activity-tool">${esc(r.tool)}</span>
-          <span class="activity-params">${esc(paramsSummary) || '—'}</span>
+          ${caller ? `<span class="activity-params" style="color:var(--text);">${esc(caller)}</span>` : ''}
+          <span class="activity-params">${esc(otherParams) || '—'}</span>
           ${verdictPill(r.verdict)}
           <span class="activity-rule">${esc(r.rule_name || r.rule_id || '—')}</span>
         </summary>
         <div class="activity-detail">
-          <div class="activity-detail-label">Full request</div>
+          <div class="activity-detail-label">Full request &nbsp;·&nbsp; token: <code style="font-size:11px;">${esc(tokenShort)}</code></div>
           <pre>${esc(detail)}</pre>
         </div>
       </details>`;

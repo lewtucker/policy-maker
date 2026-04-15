@@ -671,6 +671,7 @@ async def check(body: CheckRequest, authorization: str = Header(...)):
         verdict=verdict,
         rule_id=rule_id,
         rule_name=rule_name,
+        token=token,
     )
 
     # For pending verdicts, create an approval record the admin can resolve

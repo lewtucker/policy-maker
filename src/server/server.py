@@ -548,7 +548,10 @@ async def revoke_token(request: Request):
 @app.get("/activity")
 async def get_activity(request: Request, limit: int = 50):
     email = _require_session(request)
-    rows = database.get_check_log(email, limit=min(limit, 200))
+    if request.session.get("is_admin"):
+        rows = database.get_all_check_log(limit=min(limit, 500))
+    else:
+        rows = database.get_check_log(email, limit=min(limit, 200))
     return {"activity": [dict(r) for r in rows]}
 
 

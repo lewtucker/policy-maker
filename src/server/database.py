@@ -212,6 +212,13 @@ def log_check(email: str, tool: str, params_json: str, verdict: str,
         conn.commit()
 
 
+def get_all_check_log(limit: int = 500) -> list[sqlite3.Row]:
+    with _conn() as conn:
+        return conn.execute(
+            "SELECT * FROM check_log ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+
+
 def get_check_log(email: str, limit: int = 50) -> list[sqlite3.Row]:
     with _conn() as conn:
         return conn.execute(

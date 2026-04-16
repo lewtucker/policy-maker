@@ -354,7 +354,10 @@
   <div class="sidebar-bottom">
     <div class="user-row">
       <span style="font-size:15px;">👤</span>
-      <span class="user-email sidebar-email-link" id="sidebar-email" onclick="showPage('profile',this)" title="Manage profile">…</span>
+      <span class="user-email sidebar-email-link" id="sidebar-email" onclick="showPage('profile',this)" title="Manage profile" style="display:flex;flex-direction:column;gap:1px;">
+        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);line-height:1;">Profile</span>
+        <span id="sidebar-email-text">…</span>
+      </span>
       <form method="POST" action="/logout" style="flex-shrink:0;">
         <button type="submit" class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px;">Sign out</button>
       </form>
@@ -957,7 +960,7 @@
     if (!res) return;
     if (res.ok) {
       const data = await res.json();
-      document.getElementById('sidebar-email').textContent = data.email;
+      document.getElementById('sidebar-email-text').textContent = data.email;
       document.getElementById('home-email').textContent    = data.email.split('@')[0];
       document.getElementById('status-label').textContent  = `Ready · ${data.rule_count} rule${data.rule_count !== 1 ? 's' : ''}`;
       document.getElementById('status-dot').style.background = 'var(--green)';

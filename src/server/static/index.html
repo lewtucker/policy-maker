@@ -471,7 +471,8 @@
       </div>
       <div class="page-actions">
         <button class="btn btn-ghost btn-sm" onclick="openModal('import-modal')">↑ Import</button>
-        <button class="btn btn-ghost btn-sm" onclick="exportYaml()">↓ Export</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportYaml()">↓ Export YAML</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportWithScenarios()">↓ Export + Scenarios</button>
         <button class="btn btn-ghost btn-sm" id="analyze-btn" onclick="toggleHealth()">⬡ Analyze</button>
         <button class="btn btn-red btn-sm" onclick="deleteAll()">Delete all</button>
         <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Add rule</button>
@@ -615,6 +616,13 @@
           <input class="sim-inline" id="sim-program" placeholder="program"   oninput="autosize(this)" onkeydown="if(event.key==='Enter')runSimulation()" />
           <span class="sim-word">on path</span>
           <input class="sim-inline" id="sim-path"    placeholder="any path"  oninput="autosize(this)" onkeydown="if(event.key==='Enter')runSimulation()" />
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0 4px;border-top:1px solid var(--border);margin-top:8px;">
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0;">Load scenario:</span>
+          <input type="text" id="sim-scenario-paste" placeholder="Paste a scenario line from the export…"
+                 style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;font-family:var(--mono);color:var(--text);outline:none;"
+                 onkeydown="if(event.key==='Enter'){applyScenario();}" />
+          <button class="btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="applyScenario()">Load</button>
         </div>
         <div class="sim-bottom-row">
           <div class="sim-presets">
@@ -1175,6 +1183,73 @@
     a.href = '/policies/export';
     a.download = 'policies.yaml';
     a.click();
+  }
+
+  async function exportWithScenarios() {
+    // Fetch the YAML rules text
+    const res = await api('GET', '/policies/export');
+    if (!res || !res.ok) return;
+    const yamlText = await res.text();
+
+    // Fetch ordered rules list for scenario generation
+    const res2 = await api('GET', '/policies');
+    if (!res2 || !res2.ok) return;
+    const { policies } = await res2.json();
+
+    const pad = (s, n) => s.length >= n ? s + '  ' : s + ' '.repeat(n - s.length);
+    const date = new Date().toISOString().slice(0, 10);
+
+    const scenarioLines = policies.map(rule => {
+      const m = rule.match || {};
+      const parts = [];
+      if (m.person)  parts.push(`person=${m.person}`);
+      if (m.group)   parts.push(`group=${m.group}`);
+      if (m.tool)    parts.push(`tool=${m.tool}`);
+      if (m.program) parts.push(`program=${m.program}`);
+      if (m.path)    parts.push(`path=${m.path}`);
+      const lhs = parts.length ? parts.join(' ') : '(catch-all)';
+      return `${pad(lhs, 60)}→ EXPECTED: ${pad(rule.result, 10)} [${rule.id}]`;
+    });
+
+    const output = [
+      `# Policy Maker — Rules & Test Scenarios`,
+      `# Exported: ${date}`,
+      ``,
+      `===== RULES =====`,
+      ``,
+      yamlText.trim(),
+      ``,
+      `===== TEST SCENARIOS =====`,
+      `# Paste any line below into the "Load scenario" bar on the Test Action tab`,
+      `# Format: [key=value ...] → EXPECTED: <verdict>  [rule-id]`,
+      ``,
+      ...scenarioLines,
+    ].join('\n');
+
+    const blob = new Blob([output], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `policy-scenarios-${date}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ── Load scenario (Test Action paste-in) ───────────────────────────────────
+  function applyScenario() {
+    const input = document.getElementById('sim-scenario-paste');
+    const text = input.value.trim();
+    if (!text) return;
+    // Strip everything from → onward
+    const lhs = text.split('→')[0];
+    const fields = { person: '', group: '', tool: '', program: '', path: '' };
+    (lhs.match(/(\w+)=(\S+)/g) || []).forEach(pair => {
+      const eq = pair.indexOf('=');
+      const k = pair.slice(0, eq);
+      const v = pair.slice(eq + 1);
+      if (k in fields) fields[k] = v;
+    });
+    loadPreset(fields.person, fields.group, fields.tool, fields.program, fields.path);
+    input.value = '';
   }
 
   // ── Import ─────────────────────────────────────────────────────────────────
